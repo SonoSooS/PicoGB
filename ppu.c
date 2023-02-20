@@ -139,7 +139,7 @@ static const pixel_t ditherbuf[4][4] =
 
 #if !PPU_IS_MONOCHROME
 static const pixel_t palette[] =
-#if PPU_MODE == 4
+#if PPU_MODE == 4 || PPU_MODE == 5
 {0xA, 0x2, 0x8, 0x0};
 #else
 {0x202020, 0x476951, 0x79AF98, 0xBDEF86};
@@ -190,8 +190,6 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
         {
             var coli = ((attr & 7) << 2) | bd;
             
-            //var px = pp->BGP[coli];
-            
             #if !CONFIG_PPU_CGB_MONO
             var px16 = !is_sprite ? pp->BGP[coli] : pp->OBP[coli];
             
@@ -230,9 +228,7 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
             }
             
             
-            #if PPU_IS_MONOCHROME
-            
-            //px = (px << 1) | (bd >> 1);
+        #if PPU_IS_MONOCHROME
             
             #if PPU_IS_DITHER
             px = (px << PPU_IS_BPP) | ditherbuf[bd][spos ^ (j & ((1 << PPU_IS_BPP) - 1))];
@@ -250,40 +246,11 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
             [bd];
         #endif
             
-            #if PPU_MODE == 4
+        #if PPU_MODE == 4
             px |= px << 4;
-            #endif
+        #endif
             
-            #endif
-            /*
-            if(!(coli >> 2))
-                px = 0xFFFFFF;
-            else
-            {
-                px = 0;
-                if(coli & (1 << 2))
-                    px |= 0x000000FF;
-                if(coli & (1 << 3))
-                    px |= 0x0000FF00;
-                if(coli & (1 << 4))
-                    px |= 0x00FF0000;
-            }
-            
-            switch(coli & 3)
-            {
-                default:
-                    break;
-                case 2:
-                    px = (px >> 1) & 0x7F7F7F7F;
-                    break;
-                case 1:
-                    px = (px >> 2) & 0x3F3F3F3F;
-                    break;
-                case 0:
-                    px = (px >> 3) & 0x1F1F1F1F;
-                    break;
-            }
-            */
+        #endif
         }
         
         #if !PPU_IS_MONOCHROME
@@ -297,8 +264,6 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
     #if PPU_IS_MONOCHROME
     if(ppos)
     {
-        // 
-        
         *(scanline) = (*(scanline) & (~pm >> ppos)) | ((px & pm) >> ppos);
         
         ++scanline;
@@ -437,19 +402,12 @@ static inline word ppu_stat_set_mode(self, word mode)
     return prev;
 }
 
-//#include <stdio.h>
-
 static void ppu_update_LYC(self, word scanY)
 {
     if(scanY == pp->rLYC)
     {
-        //printf("- ?LYCC %02X\n", scanY);
-        
         if(!(pp->rSTAT & 4) && (pp->rSTAT & (1 << 6)))
-        {
-            //puts("  - Setting LYC IRQ!");
             pp->IF_SCHED |= 2;
-        }
         
         pp->rSTAT |= 4;
     }
@@ -495,7 +453,6 @@ void ppu_turn_on(self)
 {
     ppu_update_newline(pp, 0);
 }
-
 
 static inline void ppu_tick_internal_1(self)
 {
@@ -586,37 +543,6 @@ static inline void ppu_tick_internal_3(self)
     ppu_update_newline(pp, scanY);
 }
 
-/*
-static void ppu_tick_internal(self, word ncycles)
-{
-    USE_STATE;
-    
-    var scanX = ps->scanX;
-    var endcycle = scanX + ncycles;
-    
-    var scanY = ps->scanY;
-    
-    var i, j;
-    
-    if(scanY >= 144)
-        goto ppu_end;
-    
-    if(crossed(UPDATE_1, scanX, endcycle))
-        ppu_tick_internal_1(pp);
-    
-    if(crossed(UPDATE_2, scanX, endcycle))
-        ppu_tick_internal_2(pp);
-    
-    ppu_end:
-    if(endcycle >= UPDATE_3)
-    {
-        
-        
-        //ppu_update_LYC(pp, scanY);
-    }
-    ps->scanX = endcycle;
-}*/
-
 void ppu_tick_internal(self, word ncycles, word rem)
 {
     var ren = pp->next_update_n;
@@ -671,25 +597,4 @@ void ppu_tick_internal(self, word ncycles, word rem)
             return;
         }
     }
-    
-    /*
-    if(endcycle >= UPDATE_3)
-    {
-        endcycle = ncycles;
-        do
-        {
-            var sub = UPDATE_3 - scanX;
-            ppu_tick_internal(pp, sub);
-            scanX = 0;
-            endcycle -= sub;
-        }
-        while(endcycle >= UPDATE_3);
-        
-        if(endcycle)
-            ppu_tick_internal(pp, endcycle);
-    }
-    else
-    {
-        ppu_tick_internal(pp, ncycles);
-    }*/
 }

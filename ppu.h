@@ -83,8 +83,7 @@ static inline word ppu_tick(ppu_t* __restrict pp, word ncycles)
     
     var ret = pp->IF_SCHED;
     if(ret)
-    {
         pp->IF_SCHED = 0;
-    }
+    
     return ret;
 }

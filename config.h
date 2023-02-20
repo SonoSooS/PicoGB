@@ -35,6 +35,8 @@
 // 1 - 1bpp jankdither globally fixed
 // 2 - 1bpp nodither
 // 3 - 1bpp jankdither locally fixed
+// 4 - 2x4bpp ANSI 16-color packed, doubled
+// 5 - 8bpp ANSI 16-color (low nybble), single
 #define PPU_MODE 0
 
 // 0 - no interlacing
