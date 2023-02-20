@@ -1,0 +1,6 @@
+*.txt
+*.bin
+*.py
+*.out
+*.exe
+/profi.c
