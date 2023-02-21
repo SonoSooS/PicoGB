@@ -23,8 +23,8 @@
 struct mb_mi_cache
 {
     const r8* __restrict mc_execute[MICACHE_R_VALUE(0x10000)];
-    r8* __restrict mc_write[MICACHE_R_VALUE(0x10000)];
     const r8* __restrict mc_read[MICACHE_R_VALUE(0x10000)];
+    r8* __restrict mc_write[MICACHE_R_VALUE(0x10000)];
     void* _mc_dummy;
 };
 
@@ -58,7 +58,7 @@ struct mb_state
     r16 FR2;
     var FMC_MODE;
     struct mi_dispatch* mi;
-    struct mb_mi_cache micache;
+    struct mb_mi_cache micache; 
 };
 typedef struct mb_state mb_state;
 

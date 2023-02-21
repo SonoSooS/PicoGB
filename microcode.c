@@ -23,6 +23,8 @@
 #define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
 #define USE_MI struct mi_dispatch* __restrict mi = mb->mi;
 
+#define ATTR_HOT __attribute__((hot))
+
 
 static const r8* mch_resolve_mic_read_internal(const self, word addr)
 {
@@ -241,13 +243,9 @@ static inline void mch_memory_dispatch_write_ROM(const self, word addr, word dat
     mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, 1);
 }
 
-static word mch_memory_dispatch_read_(self, word addr)
+ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
 {
-    USE_MIC;
-    
-    var r_addr = MICACHE_R_VALUE(addr);
-    
-    if(r_addr < MICACHE_R_VALUE(0xE000))
+    if(addr < 0xE000)
     {
         const r8* ptr;
     wram_read:
@@ -258,7 +256,6 @@ static word mch_memory_dispatch_read_(self, word addr)
     if(addr < 0xFE00)
     {
         addr -= 0x2000;
-        r_addr = MICACHE_R_VALUE(addr);
         goto wram_read;
     }
     
@@ -307,7 +304,7 @@ static void mch_memory_dispatch_write(self, word addr, word data)
     else
     {
         mch_memory_dispatch_write_ROM(mb, addr, data);
-        micache_invalidate_range(mic, 0x4000, 0x7FFF);
+        //micache_invalidate_range(mic, 0x4000, 0x7FFF);
         
         return;
     }
@@ -315,11 +312,7 @@ static void mch_memory_dispatch_write(self, word addr, word data)
 
 static inline word mch_memory_fetch_decode_1(self, word addr)
 {
-    USE_MIC;
-    
-    var r_addr = MICACHE_R_VALUE(addr);
-    
-    if(r_addr < MICACHE_R_VALUE(0xE000))
+    if(addr < 0xE000)
     {
         const r8* ptr;
     wram_read:
@@ -330,7 +323,6 @@ static inline word mch_memory_fetch_decode_1(self, word addr)
     if(addr < 0xFE00)
     {
         addr -= 0x2000;
-        r_addr = MICACHE_R_VALUE(addr);
         goto wram_read;
     }
     
@@ -364,7 +356,7 @@ static word mch_memory_fetch_decode_2(self, word addr)
     return res;
 }
 
-static word mch_memory_fetch_PC(self)
+ATTR_HOT static word mch_memory_fetch_PC(self)
 {
     word addr = mb->PC;
     mb->PC = (addr + 1) & 0xFFFF;
@@ -374,7 +366,7 @@ static word mch_memory_fetch_PC(self)
     return res;
 }
 
-static word mch_memory_fetch_PC_2(self)
+ATTR_HOT static word mch_memory_fetch_PC_2(self)
 {
     word addr = mb->PC;
     #if CONFIG_DBG
@@ -443,7 +435,6 @@ word mbh_fr_get(self, word Fin)
     switch(mb->FMC_MODE & 0xF)
     {
         default:
-            fputs("HIT DEFAULT WTF", stderr);
             return Fin;
         
         case MB_FMC_MODE_ADD_r16_r8:
@@ -581,7 +572,7 @@ void disasm_CB(const struct mb_state* __restrict mb, word CBIR)
 
 #pragma endregion
 
-word mb_exec(self)
+ATTR_HOT word mb_exec(self)
 {
     register var IR = mb->IR.low;
     r16* __restrict ld_dst_addr;

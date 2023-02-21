@@ -460,6 +460,8 @@ word cb_ROM_(void* userdata, word addr, word data, word type)
                     ud->mb->mi->BANK_ROM = (data & 0x1F) & (ud->mb->mi->N_ROM - 1);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                     break;
                 case 2:
                     if(data && (ud->mb->mi->N_ROM > 0x20))
@@ -480,6 +482,8 @@ word cb_ROM_(void* userdata, word addr, word data, word type)
                     ud->mb->mi->BANK_ROM = (data) & (ud->mb->mi->N_ROM - 1);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                 }
             }
             break;
@@ -492,6 +496,8 @@ word cb_ROM_(void* userdata, word addr, word data, word type)
                     ud->mb->mi->BANK_ROM = (data & 0x1F) & (ud->mb->mi->N_ROM - 1);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                     break;
                 case 2:
                     assert(!"MBC3 RAM/reg sel is not supported yet");
@@ -512,6 +518,8 @@ word cb_ROM_(void* userdata, word addr, word data, word type)
                     ud->mb->mi->BANK_ROM = (data & 0xFF) & (ud->mb->mi->N_ROM - 1);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                     break;
                 case 3:
                     if(data)
@@ -520,6 +528,7 @@ word cb_ROM_(void* userdata, word addr, word data, word type)
                 case 4:
                 case 5:
                     ud->mb->mi->BANK_SRAM = (data & 3) & (ud->mb->mi->N_SRAM - 1);
+                    micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
                     break;
                 default:
                     //assert(!"MBC5 unsupported write");
@@ -532,7 +541,7 @@ word cb_ROM_(void* userdata, word addr, word data, word type)
     }
     
     //micache_invalidate(&ud->mb->micache);
-    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
+    //micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
     
     return 0xFF;
 }
