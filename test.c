@@ -523,17 +523,25 @@ static void wnd_blit(HWND wnd, const struct ppu_t* __restrict pp)
 }
 
 #if CONFIG_DOCTOR
-static void dbg_dump(const struct mb_state* __restrict mb)
+word mbh_fr_get(struct mb_state* __restrict mb, word Fin);
+
+static void dbg_dump(struct mb_state* __restrict mb)
 {
     var PC = mb->PC;
     if(PC)
         PC -= 1;
     
+    var flag = mb->reg.F;
+    var fmode = mb->FMC_MODE;
+    flag = mbh_fr_get(mb, flag);
+    //if(flag != mb->reg.F)
+    //    printf("! FLAG CHANGE %02X --> %02X with Mode%u (%02X op %02X)\n", mb->reg.F, flag, fmode, mb->FR1, mb->FR2);
+    
     printf
     (
-        "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,\n",
+        "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X, POSTFLAG:%02X\n",
         mb->reg.A,
-        mb->reg.F,
+        flag,
         mb->reg.B,
         mb->reg.C,
         mb->reg.D,
@@ -542,8 +550,11 @@ static void dbg_dump(const struct mb_state* __restrict mb)
         mb->reg.L,
         mb->SP,
         PC,
-        mb->IR.low
+        mb->IR.low,
+        mb->reg.F
     );
+    
+    mb->reg.F = flag;
 }
 #endif
 

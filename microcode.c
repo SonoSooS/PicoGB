@@ -387,24 +387,150 @@ static word mch_memory_fetch_PC_2(self)
     return resp;
 }
 
-static inline word mbh_cc_check(word IR, word F)
+
+static inline void mbh_fr_set_r8_add(self, word left, word right)
+{
+    mb->FR1 = left;
+    mb->FR2 = right;
+    mb->FMC_MODE = MB_FMC_MODE_ADD_r8;
+}
+
+static inline void mbh_fr_set_r8_adc(self, word left, word right)
+{
+    mb->FR1 = left;
+    mb->FR2 = right;
+    mb->FMC_MODE = MB_FMC_MODE_ADC_r8;
+}
+
+static inline void mbh_fr_set_r8_sub(self, word left, word right)
+{
+    mb->FR1 = left;
+    mb->FR2 = right;
+    mb->FMC_MODE = MB_FMC_MODE_SUB_r8;
+}
+
+static inline void mbh_fr_set_r8_sbc(self, word left, word right)
+{
+    mb->FR1 = left;
+    mb->FR2 = right;
+    mb->FMC_MODE = MB_FMC_MODE_SBC_r8;
+}
+
+static inline void mbh_fr_set_r16_add(self, word left, word right)
+{
+    mb->FR1 = left;
+    mb->FR2 = right;
+    mb->FMC_MODE = MB_FMC_MODE_ADD_r16;
+}
+
+static inline void mbh_fr_set_r16_add_r8(self, word left, word right)
+{
+    mb->FR1 = left;
+    mb->FR2 = right;
+    mb->FMC_MODE = MB_FMC_MODE_ADD_r16_r8;
+}
+
+word mbh_fr_get(self, word Fin)
+{
+    if(!mb->FMC_MODE)
+        return Fin;
+    
+    var n1 = mb->FR1;
+    var n2 = mb->FR2;
+    
+    Fin &= 0xD0;
+    
+    switch(mb->FMC_MODE & 0xF)
+    {
+        default:
+            fputs("HIT DEFAULT WTF", stderr);
+            return Fin;
+        
+        case MB_FMC_MODE_ADD_r16_r8:
+        {
+            //if(((n1 & 0xF00) + (n2 & 0xF00)) > 0xFFF)
+            if(((n1 & 0xF) + (n2 & 0xF)) > 0xF)
+                Fin |= 0x20;
+            
+            break;
+        }
+        
+        case MB_FMC_MODE_ADD_r16:
+        {
+            if(((n1 & 0xFFF) + (n2 & 0xFFF)) > 0xFFF)
+                Fin |= 0x20;
+            
+            break;
+        }
+        
+        
+        case MB_FMC_MODE_ADD_r8:
+        {
+            if(((n1 & 0xF) + (n2 & 0xF)) > 0xF)
+                Fin |= 0x20;
+            
+            break;
+        }
+        
+        case MB_FMC_MODE_ADC_r8:
+        {
+            if(((n1 & 0xF) + (n2 & 0xF) + 1) > 0xF)
+                Fin |= 0x20;
+            
+            break;
+        }
+        
+        case MB_FMC_MODE_SUB_r8:
+        {
+            if((n1 & 0xF) < (n2 & 0xF))
+                Fin |= 0x20;
+            
+            break;
+        }
+        
+        case MB_FMC_MODE_SBC_r8:
+        {
+            if((n1 & 0xF) < ((n2 & 0xF) + 1))
+                Fin |= 0x20;
+            
+            break;
+        }
+    }
+    
+    mb->FMC_MODE = 0;
+    return Fin;
+}
+
+static inline word mbh_cc_check_0(word F)
+{
+    return ~F & 0x80; // NZ
+}
+
+static inline word mbh_cc_check_1(word F)
+{
+    return F & 0x80; // Z
+}
+
+static inline word mbh_cc_check_2(word F)
+{
+    return ~F & 0x10; // NC
+}
+
+static inline word mbh_cc_check_3(word F)
+{
+    return F & 0x10; // C
+}
+
+static word mbh_cc_check(word IR, word F)
 {
     word res;
     
     switch((IR >> 3) & 3)
     {
-        case 0: // NZ
-            res = ~F & 0x80;
-            return res;
-        case 1: // Z
-            res = F & 0x80;
-            return res;
-        case 2: // NC
-            res = ~F & 0x10;
-            return res;
-        case 3: // C
-            res = F & 0x10;
-            return res;
+        case 0: return mbh_cc_check_0(F); // NZ
+        case 1: return mbh_cc_check_1(F); // Z
+        case 2: return mbh_cc_check_2(F); // NC
+        case 3: return mbh_cc_check_3(F); // C
         
         default:
             __builtin_unreachable();
@@ -527,7 +653,8 @@ word mb_exec(self)
         case 0x28:
         case 0x30:
         case 0x38:
-            goto instr_JNR_cc_e8;
+            //goto instr_JNR_cc_e8; //TODO: fix this!
+            #error fix this
         
         case 0x01:
             ld_dst_addr = &mb->reg.raw16[0];
@@ -639,7 +766,7 @@ word mb_exec(self)
         case 0xD0:
         case 0xC8:
         case 0xD8:
-            goto instr_RET_cc;
+            goto instr_RET_cc; //TODO: CC_CHECK is not separate, optimize this
         
         case 0xE0:
             wdat = 0xFF00 | mch_memory_fetch_PC(mb);
@@ -649,19 +776,8 @@ word mb_exec(self)
             goto instr_360;
         
         case 0xE8:
-            wdat = mch_memory_fetch_PC(mb);
-            if(wdat >= 0x80)
-                wdat |= 0xFF00;
-            
-            wdat = (wdat + mb->SP) & 0xFFFF;
-            goto instr_350;
         case 0xF8:
-            wdat = mch_memory_fetch_PC(mb);
-            if(wdat >= 0x80)
-                wdat |= 0xFF00;
-            
-            wdat = (wdat + mb->SP) & 0xFFFF;
-            goto instr_370;
+            goto instr_weird_r16_r8;
         
         case 0xC9: goto instr_311;
         case 0xD9: goto instr_331;
@@ -692,7 +808,7 @@ word mb_exec(self)
         case 0xD2:
         case 0xCA:
         case 0xDA:
-            goto instr_JP_cc_n16;
+            goto instr_JP_cc_n16; //TODO: can be optimized due to CC_CHECK being separate
         
         case 0xC3: goto instr_303;
         case 0xCB: goto instr_313;
@@ -703,7 +819,7 @@ word mb_exec(self)
         case 0xCC:
         case 0xD4:
         case 0xDC:
-            goto instr_CALL_cc_n16;
+            goto instr_CALL_cc_n16; //TODO: optimize CC_CHECK
         
         case 0xC5:
             wdat = mb->reg.raw16[0];
@@ -765,6 +881,12 @@ word mb_exec(self)
             switch(column)
             {
                 case 0: // whatever
+                    if(0)
+                    {
+                    instr_JNR_cc_e8: // JR cc, e8
+                        row = (F_ROW & 3) | 4;
+                    }
+                    
                     switch(row)
                     {
                         instr_00:
@@ -804,15 +926,13 @@ word mb_exec(self)
                             goto generic_fetch;
                         }
                         
-                        instr_JNR_cc_e8:
-                        case 4: // JR cc, e8
-                        case 5:
-                        case 6:
-                        case 7:
-                            if(CC_CHECK)
-                                goto generic_jr;
-                            else
+                        case 4: if(mbh_cc_check_0(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+                        case 5: if(mbh_cc_check_1(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+                        case 6: if(mbh_cc_check_2(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+                        case 7: if(mbh_cc_check_3(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+                            
                             {
+                            instr_JNR_cc_e8_fail:
                                 mb->PC = (mb->PC + 1) & 0xFFFF;
                                 ncycles += 1;
                                 goto generic_fetch;
@@ -844,27 +964,19 @@ word mb_exec(self)
                     else // ADD HL, r16
                     {
                         instr_0x1_1:
-                        //TODO: half-carry bullshit, even though probably nothing uses flags from this instruction
                         
                         rdat = *ld_dst_addr;
-                        rres = mb->reg.H;
                         rflag = mb->reg.F & 0x80;
                         
-                        wdat = (rdat & 0xFF) + mb->reg.L;
-                        if(wdat >> 8)
-                            ++rres;
-                        
-                        if(((rres & 0xF) + ((rdat >> 8) & 0xF)) >> 4)
-                            rflag |= 0x20;
-                        
-                        wdat = ((rres + (rdat >> 8)) << 8) | (wdat & 0xFF);
-                        if(wdat >> 16)
+                        rres = mb->reg.HL;
+                        word mres = rres + rdat;
+                        if(mres >> 16)
                             rflag |= 0x10;
                         
-                        
-                        mb->reg.HL = wdat;
-                        
+                        mb->reg.HL = mres;
                         mb->reg.F = rflag;
+                        
+                        mbh_fr_set_r16_add(mb, rres, rdat);
                         
                         ncycles += 2 - 1; // 2nd ALU cycle parallel with fetch
                         goto generic_fetch;
@@ -945,8 +1057,6 @@ word mb_exec(self)
                         ++ncycles;
                     }
                     
-                    //TODO: fucking half carry flag
-                    
                     if(IR & 1) // DEC
                     {
                         rflag |= 0x40;
@@ -968,6 +1078,7 @@ word mb_exec(self)
                         rflag |= 0x80;
                     
                     mb->reg.F = rflag;
+                    mb->FMC_MODE = 0; // we calculate flags in-place
                     
                     if(idst != 7)
                         mb->reg.raw8[idst] = rdat;
@@ -1003,6 +1114,8 @@ word mb_exec(self)
                             rdat = (wdat >> 4) & 0x10;
                             mb->reg.A = wdat & 0xFF;
                             mb->reg.F = rdat;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_017:
@@ -1014,6 +1127,8 @@ word mb_exec(self)
                             rdat = (wdat >> 3) & 0x10;
                             mb->reg.A = wdat & 0xFF;
                             mb->reg.F = rdat;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_027:
@@ -1025,6 +1140,8 @@ word mb_exec(self)
                             rdat = (wdat >> 4) & 0x10;
                             mb->reg.A = wdat & 0xFF;
                             mb->reg.F = rdat;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_037:
@@ -1036,13 +1153,17 @@ word mb_exec(self)
                             rdat = (wdat >> 4) & 0x10;
                             mb->reg.A = wdat & 0xFF;
                             mb->reg.F = rdat;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_047:
-                        case 4: // fuck
+                        case 4: // fuck DAA
                             wdat = mb->reg.A;
                             rdat = mb->reg.F;
                             rdat &= 0x70;
+                            
+                            rdat = mbh_fr_get(mb, rdat);
                             
                             if(!(rdat & 0x40))
                             {
@@ -1058,11 +1179,22 @@ word mb_exec(self)
                                     rdat |= 0x10;
                                 }
                             }
-                            
-                            /*>
-                            if(wdat >> 8)
-                                rdat |= 0x10;
-                            */
+                            else
+                            {
+                                // why the fuck the assemmetry???
+                                
+                                if((rdat & 0x20))// || ((wdat & 0xF) > 9))
+                                {
+                                    wdat -= 6;
+                                    rdat |= 0x20;
+                                }
+                                
+                                if((rdat & 0x10))// || (((wdat >> 4) & 0x1F) > 9))
+                                {
+                                    wdat -= 6 << 4;
+                                    rdat |= 0x10;
+                                }
+                            }
                             
                             rdat &= 0x50;
                             
@@ -1082,16 +1214,22 @@ word mb_exec(self)
                         case 5: // CPL A
                             mb->reg.F |= 0x60;
                             mb->reg.A = ~mb->reg.A;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_067:
                         case 6: // SET Cy
                             mb->reg.F = (mb->reg.F & 0x80) | 0x10;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_077:
                         case 7: // CPL Cy
-                            mb->reg.F = (mb->reg.F & 0x90) ^ 0x10;
+                            mb->reg.F = (mb->reg.F ^ 0x10) & 0x90;
+                            
+                            mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         default:
@@ -1167,124 +1305,96 @@ word mb_exec(self)
             
             switch(F_ROW)
             {
-                //instr_ALU_0:
+                instr_ALU_0:
                 case 0: // ADD Z0HC
-                    rflag = 0;
-                    goto alu_case_1;
+                    mbh_fr_set_r8_add(mb, rres, rdat);
+                    
+                instr_ALU_0_cont:
+                    rres = rres + rdat;
+                    if(rres >> 8)
+                        rflag = 0x10;
+                    else
+                        rflag = 0;
+                    
+                    
+                    break;
                 
                 //instr_ALU_1:
                 case 1: // ADC Z0HC
-                    rflag = mb->reg.F & 0x10;
-                    
-                alu_case_1:
-                {
-                    /*
-                    printf("!   %u %02X %02X", F_ROW, rres, rdat);
-                    if(F_ROW & 2)
-                        printf(" (%02X)\n", rdat ^ 0xFF);
-                    else
-                        puts("");
-                    */
-                    
-                    // (wdat & 0xF) < ((rres & 0xF) + Cy)
-                    // (wdat & 0xF) + (~rres & 0xF) + Cy^NF) & 0x10
-                    // !(((a & 0xF) + ((~b) & 0xF) + (c^1)) & 0x10)
-                    
-                    wdat = (rdat & 0xF) + (rres & 0xF) + (((rflag >> 4) ^ (rflag >> 6)) & 1);
-                    if(!(wdat & 0x10) != !((rflag >> 6) & 1))
-                        rflag |= 0x20;
-                    
-                    wdat += (rdat & 0xF0) + (rres & 0xF0) + ((rflag << 2) & 0x100);
-                    if(wdat & 0x100)
-                        rflag |= 0x10;
-                    else
-                        rflag &= 0xE0;
-                    
-                    if(F_ROW != 7)
+                    if(mb->reg.F & 0x10)
                     {
-                        /*
-                        printf("! %03X %c%c%c%c\n", wdat,
-                            (rflag & 0x80) ? 'Z' : '-',
-                            (rflag & 0x40) ? 'N' : '-',
-                            (rflag & 0x20) ? 'H' : '-',
-                            (rflag & 0x10) ? 'C' : '-'
-                        );
-                        */
-                        
-                        rres = wdat;
-                        
-                        if(!(F_ROW & 2))
-                            break;
-                        
-                        //rflag ^= 0x10;
-                        //rflag ^= 0x20;
-                        
-                        break;
+                        mbh_fr_set_r8_adc(mb, rres, rdat);
+                        rdat += 1;
+                        goto instr_ALU_0_cont;
                     }
                     else
                     {
-                        //printf("! CP %02X, %02X (%02X)\n", rres, rdat, wdat);
-                        rres = wdat ^ 0x1FF;
-                        if(!(rres & 0xFF))
-                            rflag |= 0x80;
-                        
-                        rflag ^= 0x10;
-                        mb->reg.F = rflag;
-                        
-                        goto generic_fetch;
+                        goto instr_ALU_0;
                     }
+                
+                instr_ALU_2:
+                case 2: // SUB Z1HC
+                    mbh_fr_set_r8_sub(mb, rres, rdat);
+                    
+                instr_ALU_2_cont:
+                    rres = rres - rdat;
+                    if(rres >> 8)
+                        rflag = 0x50;
+                    else
+                        rflag = 0x40;
                     
                     break;
-                }
-                
-                //instr_ALU_2:
-                case 2: // SUB Z1HC
-                    rflag = 0x40;
-                    rdat ^= 0xFF;
-                    goto alu_case_1;
-                
-                //instr_ALU_7:
-                case 7: // CMP Z1HC
-                    //TODO: fuck this
-                    /*
-                    rflag = 0x50;
-                    rdat ^= 0xFF;
-                    goto alu_case_1;
-                    */
-                    
-                    rflag = 0x40;
-                    if(rres < rdat)
-                        rflag |= 0x10;
-                    if((rres & 0xF) < (rdat & 0xF))
-                        rflag |= 0x20;
-                    
-                    if(rres == rdat)
-                       rflag |= 0x80;
-                    
-                    mb->reg.F = rflag; 
-                    
-                    goto generic_fetch;
                 
                 //instr_ALU_3:
                 case 3: // SBC Z1HC
-                    rflag = (mb->reg.F & 0x10) ^ 0x40;
-                    rdat ^= 0xFF;
-                    goto alu_case_1;
+                    if(mb->reg.F & 0x10)
+                    {
+                        mbh_fr_set_r8_sbc(mb, rres, rdat);
+                        rdat += 1;
+                        goto instr_ALU_2_cont;
+                    }
+                    else
+                    {
+                        goto instr_ALU_2;
+                    }
+                
+                 //instr_ALU_7:
+                case 7: // CMP Z1HC
+                    mbh_fr_set_r8_sub(mb, rres, rdat);
+                    
+                    rres = rres - rdat;
+                    if(rres >> 8)
+                        rflag = 0x50;
+                    else
+                        rflag = 0x40;
+                    
+                    if(!(rres & 0xFF))
+                        rflag |=0x80;
+                    
+                    mb->reg.F = rflag;
+                    
+                    goto generic_fetch;
                 
                 //instr_ALU_4:
                 case 4: // AND Z010
+                    mb->FMC_MODE = 0;
+                    
                     rflag = 0x20;
                     rres &= rdat;
                     break;
                 
                 //instr_ALU_5:
                 case 5: // XOR Z000
+                    mb->FMC_MODE = 0;
+                    
                     rflag = 0;
                     rres ^= rdat;
                     break;
                 
                 //instr_ALU_6:
                 case 6: // ORR Z000
+                    mb->FMC_MODE = 0;
+                    
                     rflag = 0;
                     rres |= rdat;
                     break;
@@ -1337,25 +1447,35 @@ word mb_exec(self)
                         else
                         {
                             //TODO: nobody uses the flags from this output, but still would be good if it actually got updated properly
-                            
+                        instr_weird_r16_r8:
                             wdat = mch_memory_fetch_PC(mb);
                             if(wdat >= 0x80)
                                 wdat |= 0xFF00;
                             
-                            wdat = (wdat + mb->SP) & 0xFFFF;
+                            rdat = mb->SP;
+                            mbh_fr_set_r16_add_r8(mb, rdat, wdat);
+                            mb->FMC_MODE = 0; // fuck this, the call rate is so low that it's cheaper to do in-place
+                            
+                            rflag = 0;
+                            
+                            if(((wdat & 0xFF) + (rdat & 0xFF)) >> 8)
+                                rflag |= 0x10;
+                            
+                            if(((wdat & 0xF) + (rdat & 0xF)) >> 4)
+                                rflag |= 0x20;
+                            
+                            wdat = (wdat + rdat) & 0xFFFF;
+                            
+                            mb->reg.F = rflag;
                             
                             if(IR & 0x10) // HL = SP + e8
                             {
-                                instr_370:
-                                mb->reg.F &= 0xB0;
                                 mb->reg.HL = wdat;
                                 ncycles += 2; // ???
                             }
                             else // SP = SP + e8
                             {
-                                instr_350:
                                 mb->SP = wdat;
-                                mb->reg.F &= 0x30;
                                 ncycles += 3; // ???
                             }
                             
@@ -1433,9 +1553,14 @@ word mb_exec(self)
                         
                         isrc = (IR >> 4) & 3;
                         if(isrc != 3)
+                        {
                             mb->reg.raw16[isrc] = wdat;
+                        }
                         else
+                        {
                             MB_W_AF(wdat);
+                            mb->FMC_MODE = 0; // overwritten manually
+                        }
                         
                         goto generic_fetch;
                     }
@@ -1487,7 +1612,7 @@ word mb_exec(self)
                     }
                     else // JP cc, n16
                     {
-                        instr_JP_cc_n16:
+                        instr_JP_cc_n16: //TODO: optimize this if possible
                         // small optimization, no imm fetch if no match
                         
                         if(CC_CHECK)
@@ -1541,7 +1666,7 @@ word mb_exec(self)
                     
                     if(!(IR & 32))
                     {
-                        instr_CALL_cc_n16:
+                        instr_CALL_cc_n16: //TODO: optimize
                         
                         if(CC_CHECK)
                             goto generic_call;
@@ -1564,9 +1689,15 @@ word mb_exec(self)
                     {
                         isrc = (IR >> 4) & 3;
                         if(isrc != 3)
+                        {
                             wdat = mb->reg.raw16[isrc];
+                        }
                         else
+                        {
+                            mb->reg.F = mbh_fr_get(mb, mb->reg.F);
+                            
                             wdat = MB_R_AF;
+                        }
                         
                     generic_push:
                         if(1)

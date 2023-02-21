@@ -3,6 +3,18 @@
 #include "types.h"
 #include "mi.h"
 
+
+#define MB_FMC_MODE_NONE 0
+#define MB_FMC_MODE_ADD_r16 1
+#define MB_FMC_MODE_SUB_r8 2
+#define MB_FMC_MODE_ADD_r8 3
+//#define MB_FMC_MODE_NONE_4 4
+#define MB_FMC_MODE_ADD_r16_r8 5
+#define MB_FMC_MODE_ADC_r8 6
+#define MB_FMC_MODE_SBC_r8 7
+
+#define MB_FMC_MODE_MAX 4
+
 #define MICACHE_R_RESET 0xFFFF
 #define MICACHE_R_BITS 12
 #define MICACHE_R_SEL ((1 << 12) - 1)
@@ -44,8 +56,7 @@ struct mb_state
     var HALTING;
     r16 FR1;
     r16 FR2;
-    r16 FMC;
-    r16 FMC_MODE;
+    var FMC_MODE;
     struct mi_dispatch* mi;
     struct mb_mi_cache micache;
 };
