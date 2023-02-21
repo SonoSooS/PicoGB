@@ -641,6 +641,7 @@ word mb_exec(self)
     }
 #endif
     
+    // BROKEN, DO NOT USE
     #if 0
     switch(IR)
     {
@@ -649,12 +650,10 @@ word mb_exec(self)
         case 0x08: goto instr_08;
         case 0x18: goto instr_18;
         
-        case 0x20:
-        case 0x28:
-        case 0x30:
-        case 0x38:
-            //goto instr_JNR_cc_e8; //TODO: fix this!
-            #error fix this
+        case 0x20: if(mbh_cc_check_0(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+        case 0x28: if(mbh_cc_check_1(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+        case 0x30: if(mbh_cc_check_2(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
+        case 0x38: if(mbh_cc_check_3(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
         
         case 0x01:
             ld_dst_addr = &mb->reg.raw16[0];
@@ -766,7 +765,7 @@ word mb_exec(self)
         case 0xD0:
         case 0xC8:
         case 0xD8:
-            goto instr_RET_cc; //TODO: CC_CHECK is not separate, optimize this
+            goto instr_RET_cc; // could be CC_CHECK optimized, but the extra cycle is too much work to count
         
         case 0xE0:
             wdat = 0xFF00 | mch_memory_fetch_PC(mb);
@@ -804,22 +803,20 @@ word mb_exec(self)
             wdat = 0xFF00 | mb->reg.C;
             goto instr_362;
         
-        case 0xC2:
-        case 0xD2:
-        case 0xCA:
-        case 0xDA:
-            goto instr_JP_cc_n16; //TODO: can be optimized due to CC_CHECK being separate
+        case 0xC2: if(mbh_cc_check_0(mb->reg.F)) goto generic_jp_abs; else goto instr_JP_cc_n16_fail;
+        case 0xD2: if(mbh_cc_check_1(mb->reg.F)) goto generic_jp_abs; else goto instr_JP_cc_n16_fail;
+        case 0xCA: if(mbh_cc_check_2(mb->reg.F)) goto generic_jp_abs; else goto instr_JP_cc_n16_fail;
+        case 0xDA: if(mbh_cc_check_3(mb->reg.F)) goto generic_jp_abs; else goto instr_JP_cc_n16_fail;
         
         case 0xC3: goto instr_303;
         case 0xCB: goto instr_313;
         case 0xF3: goto instr_363;
         case 0xFB: goto instr_373;
         
-        case 0xC4:
-        case 0xCC:
-        case 0xD4:
-        case 0xDC:
-            goto instr_CALL_cc_n16; //TODO: optimize CC_CHECK
+        case 0xC4: if(mbh_cc_check_0(mb->reg.F)) goto generic_call; else goto instr_CALL_cc_n16;
+        case 0xCC: if(mbh_cc_check_1(mb->reg.F)) goto generic_call; else goto instr_CALL_cc_n16;
+        case 0xD4: if(mbh_cc_check_2(mb->reg.F)) goto generic_call; else goto instr_CALL_cc_n16;
+        case 0xDC: if(mbh_cc_check_3(mb->reg.F)) goto generic_call; else goto instr_CALL_cc_n16;
         
         case 0xC5:
             wdat = mb->reg.raw16[0];
@@ -1619,6 +1616,7 @@ word mb_exec(self)
                             goto generic_jp_abs;
                         else
                         {
+                        instr_JP_cc_n16_fail:
                             mb->PC = (mb->PC + 2) & 0xFFFF;
                             ncycles += 2;
                             goto generic_fetch;
@@ -1672,6 +1670,7 @@ word mb_exec(self)
                             goto generic_call;
                         else
                         {
+                        instr_CALL_cc_n16_fail:
                             mb->PC = (mb->PC + 2) & 0xFFFF;
                             ncycles += 2;
                             goto generic_fetch;
