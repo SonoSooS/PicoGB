@@ -352,7 +352,7 @@ static void ppu_render_scanline(self)
     {
         var pattern = 0x100;
         
-        for(i = 0; i != 10; ++i)
+        for(i = 10; i--;)
         {
             var posX, idx;
             {
