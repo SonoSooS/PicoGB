@@ -12,8 +12,8 @@
 #define F_COL (IR & 7)
 #define F_ROW ((IR >> 3) & 7)
 #else
-#define F_COL column
-#define F_ROW row
+#define F_COL IR_column
+#define F_ROW IR_row
 #endif
 
 #define MB_R_AF ((mb->reg.A << 8) | mb->reg.F)
@@ -25,6 +25,8 @@
 
 #define ATTR_HOT __attribute__((hot))
 
+
+#pragma region Microcode I/O
 
 static const r8* mch_resolve_mic_read_internal(const self, word addr)
 {
@@ -379,6 +381,9 @@ ATTR_HOT static word mch_memory_fetch_PC_2(self)
     return resp;
 }
 
+#pragma endregion
+
+#pragma region Flag mode control
 
 static inline void mbh_fr_set_r8_add(self, word left, word right)
 {
@@ -440,7 +445,7 @@ word mbh_fr_get(self, word Fin)
         case MB_FMC_MODE_ADD_r16_r8:
         {
             //if(((n1 & 0xF00) + (n2 & 0xF00)) > 0xFFF)
-            if(((n1 & 0xF) + (n2 & 0xF)) > 0xF)
+            if(((n1 & 0xF) + (n2 & 0xF)) > 0xF) // ???
                 Fin |= 0x20;
             
             break;
@@ -528,7 +533,9 @@ static word mbh_cc_check(word IR, word F)
     }
 }
 
-#pragma region disasm
+#pragma endregion
+
+#pragma region disasm (unfinished)
 
 static const char* str_r8[8] = {"B", "C", "D", "E", "H", "L", "[HL]", "A"};
 static const char* str_aluop[8] = {"ADD", "ADC", "SUB", "SBC", "AND", "XOR", "ORR", "CMP"};
@@ -575,25 +582,36 @@ void disasm_CB(const struct mb_state* __restrict mb, word CBIR)
 ATTR_HOT word mb_exec(self)
 {
     register var IR = mb->IR.low;
-    r16* __restrict ld_dst_addr;
+    r16* __restrict p_reg16_ptr;
     
-    var column = IR & 7;
-    var row = (IR >> 3) & 7;
+    // Instruction column left to right
+    var IR_column = IR & 7;
+    // Instruction row top to bottom
+    var IR_row = (IR >> 3) & 7;
     
+    // Cycle count
     var ncycles = 0;
     
+    // Index of source or read-only register
+    var i_src;
+    // Index of destination or read-modify-write register index
+    var i_dst;
     
-    var rdat;
-    var isrc, idst;
-    var rres, rflag;
-    var wdat;
+    // Data for 8bit registers
+    var data_reg;
+    // Data for 16bit registers
+    var data_wide;
+    // Contains flags where necessary
+    var data_flags;
+    // Contains result data to be written back eventually
+    var data_result;
     
     if(mb->IME && (mb->IE & mb->IF & 0x1F))
     {
         var F = (mb->IE & mb->IF & 0x1F);
         ++ncycles; // IDU decrement PC penalty cycle
         
-        wdat = (mb->PC - 1) & 0xFFFF;
+        data_wide = (mb->PC - 1) & 0xFFFF;
         
         var i = 0;
         for(;;)
@@ -866,16 +884,16 @@ ATTR_HOT word mb_exec(self)
     switch((IR >> 6) & 3)
     {
         case 0: // Top bullshit
-            switch(column)
+            switch(IR_column)
             {
                 case 0: // whatever
                     if(0)
                     {
                     instr_JNR_cc_e8: // JR cc, e8
-                        row = (F_ROW & 3) | 4;
+                        IR_row = (F_ROW & 3) | 4;
                     }
                     
-                    switch(row)
+                    switch(IR_row)
                     {
                         instr_00:
                         case 0: // NOP
@@ -886,12 +904,12 @@ ATTR_HOT word mb_exec(self)
                         instr_08:
                         case 1: // LD a16, SP
                         {
-                            wdat = mch_memory_fetch_PC_2(mb);
+                            data_wide = mch_memory_fetch_PC_2(mb);
                             
                             var SP = mb->SP;
                             
-                            mch_memory_dispatch_write(mb, wdat + 0, SP & 0xFF);
-                            mch_memory_dispatch_write(mb, (wdat + 1) & 0xFFFF, SP >> 8);
+                            mch_memory_dispatch_write(mb, data_wide + 0, SP & 0xFF);
+                            mch_memory_dispatch_write(mb, (data_wide + 1) & 0xFFFF, SP >> 8);
                             
                             ncycles += 2 + 2;
                             goto generic_fetch;
@@ -902,13 +920,17 @@ ATTR_HOT word mb_exec(self)
                         generic_jr:
                         {
                             var PC = mb->PC;
-                            wdat = mch_memory_fetch_PC(mb);
-                            if(wdat == 0xFE && ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F))))
-                                return 0; // wedge until NMI
-                            if(wdat >= 0x80)
-                                wdat |= 0xFF00;
+                            data_wide = mch_memory_fetch_PC(mb);
                             
-                            mb->PC = (wdat + PC + 1) & 0xFFFF;
+                            // Wedge if unbreakable spinloop is detected
+                            // TODO: unfuck this statement
+                            if(data_wide == 0xFE && ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F))))
+                                return 0; // wedge until NMI
+                            
+                            if(data_wide >= 0x80)
+                                data_wide |= 0xFF00;
+                            
+                            mb->PC = (data_wide + PC + 1) & 0xFFFF;
                             
                             ncycles += 2; // parallel add + fetch
                             goto generic_fetch;
@@ -932,19 +954,19 @@ ATTR_HOT word mb_exec(self)
                 
                 case 1: // random r16 bullshit
                 {
-                    idst = (IR >> 4) & 3;
+                    i_dst = (IR >> 4) & 3;
                     
-                    if(idst != 3)
-                        ld_dst_addr = &mb->reg.raw16[idst];
+                    if(i_dst != 3)
+                        p_reg16_ptr = &mb->reg.raw16[i_dst];
                     else
-                        ld_dst_addr = &mb->SP;
+                        p_reg16_ptr = &mb->SP;
                     
                     if(!(IR & 8)) // LD r16, n16
                     {
                         instr_0x1_0:
-                        wdat = mch_memory_fetch_PC_2(mb);
+                        data_wide = mch_memory_fetch_PC_2(mb);
                         
-                        *ld_dst_addr = wdat;
+                        *p_reg16_ptr = data_wide;
                         
                         ncycles += 2;
                         goto generic_fetch;
@@ -953,18 +975,18 @@ ATTR_HOT word mb_exec(self)
                     {
                         instr_0x1_1:
                         
-                        rdat = *ld_dst_addr;
-                        rflag = mb->reg.F & 0x80;
+                        data_reg = *p_reg16_ptr;
+                        data_flags = mb->reg.F & 0x80;
                         
-                        rres = mb->reg.HL;
-                        word mres = rres + rdat;
+                        data_result = mb->reg.HL;
+                        word mres = data_result + data_reg;
                         if(mres >> 16)
-                            rflag |= 0x10;
+                            data_flags |= 0x10;
                         
                         mb->reg.HL = mres;
-                        mb->reg.F = rflag;
+                        mb->reg.F = data_flags;
                         
-                        mbh_fr_set_r16_add(mb, rres, rdat);
+                        mbh_fr_set_r16_add(mb, data_result, data_reg);
                         
                         ncycles += 2 - 1; // 2nd ALU cycle parallel with fetch
                         goto generic_fetch;
@@ -974,30 +996,30 @@ ATTR_HOT word mb_exec(self)
                 case 2: // LD r16 ptr
                 {
                     instr_0x2:
-                    idst = (IR >> 4) & 3;
+                    i_dst = (IR >> 4) & 3;
                     
-                    if(idst < 2)
-                        ld_dst_addr = &mb->reg.raw16[idst];
+                    if(i_dst < 2)
+                        p_reg16_ptr = &mb->reg.raw16[i_dst];
                     else
-                        ld_dst_addr = &mb->reg.HL;
+                        p_reg16_ptr = &mb->reg.HL;
                     
                     if(IR & 8) // load ptr
                     {
-                        mb->reg.A = mch_memory_dispatch_read(mb, *ld_dst_addr);
+                        mb->reg.A = mch_memory_dispatch_read(mb, *p_reg16_ptr);
                     }
                     else // store ptr
                     {
-                        mch_memory_dispatch_write(mb, *ld_dst_addr, mb->reg.A);
+                        mch_memory_dispatch_write(mb, *p_reg16_ptr, mb->reg.A);
                     }
                     
-                    if(idst < 2)
+                    if(i_dst < 2)
                         ;
                     else
                     {
-                        if(!(idst & 1))
-                            ++*ld_dst_addr;
+                        if(!(i_dst & 1))
+                            ++*p_reg16_ptr;
                         else
-                            --*ld_dst_addr;
+                            --*p_reg16_ptr;
                     }
                     
                     ++ncycles;
@@ -1007,20 +1029,20 @@ ATTR_HOT word mb_exec(self)
                 case 3: // INCDEC r16
                 {
                     instr_0x3:
-                    idst = (IR >> 4) & 3;
+                    i_dst = (IR >> 4) & 3;
                     
-                    if(idst != 3)
-                        ld_dst_addr = &mb->reg.raw16[idst];
+                    if(i_dst != 3)
+                        p_reg16_ptr = &mb->reg.raw16[i_dst];
                     else
-                        ld_dst_addr = &mb->SP;
+                        p_reg16_ptr = &mb->SP;
                     
                     if(!(IR & 8)) // INC r16
                     {
-                        ++*ld_dst_addr;
+                        ++*p_reg16_ptr;
                     }
                     else // DEC r16
                     {
-                        --*ld_dst_addr;
+                        --*p_reg16_ptr;
                     }
                     
                     ++ncycles; // IDU busy penalty cycle
@@ -1033,47 +1055,47 @@ ATTR_HOT word mb_exec(self)
                     instr_0x45:
                     // Z1H-
                     
-                    idst = F_ROW ^ 1;
+                    i_dst = F_ROW ^ 1;
                     
-                    rflag = mb->reg.F & 0x10;
+                    data_flags = mb->reg.F & 0x10;
                     
-                    if(idst != 7)
-                        rdat = mb->reg.raw8[idst];
+                    if(i_dst != 7)
+                        data_reg = mb->reg.raw8[i_dst];
                     else
                     {
-                        rdat = mch_memory_dispatch_read(mb, mb->reg.HL);
+                        data_reg = mch_memory_dispatch_read(mb, mb->reg.HL);
                         ++ncycles;
                     }
                     
                     if(IR & 1) // DEC
                     {
-                        rflag |= 0x40;
+                        data_flags |= 0x40;
                         
-                        if((rdat & 0xF) == 0)
-                            rflag |= 0x20;
+                        if((data_reg & 0xF) == 0)
+                            data_flags |= 0x20;
                         
-                        rdat = (rdat - 1) & 0xFF;
+                        data_reg = (data_reg - 1) & 0xFF;
                     }
                     else // INC
                     {
-                        rdat = (rdat + 1) & 0xFF;
+                        data_reg = (data_reg + 1) & 0xFF;
                         
-                        if((rdat & 0xF) == 0)
-                            rflag |= 0x20;
+                        if((data_reg & 0xF) == 0)
+                            data_flags |= 0x20;
                     }
                     
-                    if(!rdat)
-                        rflag |= 0x80;
+                    if(!data_reg)
+                        data_flags |= 0x80;
                     
-                    mb->reg.F = rflag;
+                    mb->reg.F = data_flags;
                     mb->FMC_MODE = 0; // we calculate flags in-place
                     
-                    if(idst != 7)
-                        mb->reg.raw8[idst] = rdat;
+                    if(i_dst != 7)
+                        mb->reg.raw8[i_dst] = data_reg;
                     else
                     {
                         ++ncycles;
-                        mch_memory_dispatch_write(mb, mb->reg.HL, rdat);
+                        mch_memory_dispatch_write(mb, mb->reg.HL, data_reg);
                     }
                     
                     goto generic_fetch;
@@ -1082,8 +1104,8 @@ ATTR_HOT word mb_exec(self)
                 case 6: // LD r8, n8
                 {
                     instr_0x6:
-                    rdat = mch_memory_fetch_PC(mb);
-                    idst = F_ROW ^ 1;
+                    data_reg = mch_memory_fetch_PC(mb);
+                    i_dst = F_ROW ^ 1;
                     ++ncycles;
                     goto generic_r8_write;
                 }
@@ -1091,112 +1113,108 @@ ATTR_HOT word mb_exec(self)
                 case 7: // generic bullshit
                     // just reimpl $CB func here, too much hassle to use goto
                     
-                    switch(row) 
+                    switch(IR_row) 
                     {
                         instr_007:
                         case 0: // RLCA
-                            wdat = mb->reg.A;
-                            rdat = mb->reg.F;
-                            rdat &= 0x10;
-                            wdat = (wdat << 1) | (wdat >> 7);
-                            rdat = (wdat >> 4) & 0x10;
-                            mb->reg.A = wdat & 0xFF;
-                            mb->reg.F = rdat;
+                            data_reg = mb->reg.A;
+                            data_flags = mb->reg.F;
+                            data_flags &= 0x10;
+                            data_reg = (data_reg << 1) | (data_reg >> 7);
+                            data_flags = (data_reg >> 4) & 0x10;
+                            mb->reg.A = data_reg & 0xFF;
+                            mb->reg.F = data_flags;
                             
                             mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_017:
                         case 1: // RRCA
-                            wdat = mb->reg.A;
-                            rdat = mb->reg.F;
-                            rdat &= 0x10;
-                            wdat = (wdat << 7) | (wdat >> 1);
-                            rdat = (wdat >> 3) & 0x10;
-                            mb->reg.A = wdat & 0xFF;
-                            mb->reg.F = rdat;
+                            data_reg = mb->reg.A;
+                            data_flags = mb->reg.F;
+                            data_flags &= 0x10;
+                            data_reg = (data_reg << 7) | (data_reg >> 1);
+                            data_flags = (data_reg >> 3) & 0x10;
+                            mb->reg.A = data_reg & 0xFF;
+                            mb->reg.F = data_flags;
                             
                             mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_027:
                         case 2: // RLA
-                            wdat = mb->reg.A;
-                            rdat = mb->reg.F;
-                            rdat &= 0x10;
-                            wdat = (wdat << 1) | ((rdat >> 4) & 1);
-                            rdat = (wdat >> 4) & 0x10;
-                            mb->reg.A = wdat & 0xFF;
-                            mb->reg.F = rdat;
+                            data_reg = mb->reg.A;
+                            data_flags = mb->reg.F;
+                            data_flags &= 0x10;
+                            data_reg = (data_reg << 1) | ((data_flags >> 4) & 1);
+                            data_flags = (data_reg >> 4) & 0x10;
+                            mb->reg.A = data_reg & 0xFF;
+                            mb->reg.F = data_flags;
                             
                             mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_037:
                         case 3: // RRA
-                            wdat = mb->reg.A;
-                            rdat = mb->reg.F;
-                            rdat &= 0x10;
-                            wdat = (wdat << 8) | (wdat >> 1) | ((rdat & 0x10) << 3);
-                            rdat = (wdat >> 4) & 0x10;
-                            mb->reg.A = wdat & 0xFF;
-                            mb->reg.F = rdat;
+                            data_reg = mb->reg.A;
+                            data_flags = mb->reg.F;
+                            data_flags &= 0x10;
+                            data_reg = (data_reg << 8) | (data_reg >> 1) | ((data_flags & 0x10) << 3);
+                            data_flags = (data_reg >> 4) & 0x10;
+                            mb->reg.A = data_reg & 0xFF;
+                            mb->reg.F = data_flags;
                             
                             mb->FMC_MODE = 0;
                             goto generic_fetch;
                         
                         instr_047:
                         case 4: // fuck DAA
-                            wdat = mb->reg.A;
-                            rdat = mb->reg.F;
-                            rdat &= 0x70;
+                            data_reg = mb->reg.A;
+                            data_flags = mb->reg.F;
+                            data_flags &= 0x70;
                             
-                            rdat = mbh_fr_get(mb, rdat);
+                            data_flags = mbh_fr_get(mb, data_flags);
                             
-                            if(!(rdat & 0x40))
+                            if(!(data_flags & 0x40))
                             {
-                                if((rdat & 0x20) || ((wdat & 0xF) > 9))
+                                if((data_flags & 0x20) || ((data_reg & 0xF) > 9))
                                 {
-                                    wdat += 6;
-                                    rdat |= 0x20;
+                                    data_reg += 6;
+                                    data_flags |= 0x20;
                                 }
                                 
-                                if((rdat & 0x10) || (((wdat >> 4) & 0x1F) > 9))
+                                if((data_flags & 0x10) || (((data_reg >> 4) & 0x1F) > 9))
                                 {
-                                    wdat += 6 << 4;
-                                    rdat |= 0x10;
+                                    data_reg += 6 << 4;
+                                    data_flags |= 0x10;
                                 }
                             }
                             else
                             {
                                 // why the fuck the assemmetry???
                                 
-                                if((rdat & 0x20))// || ((wdat & 0xF) > 9))
+                                if((data_flags & 0x20))// || ((wdat & 0xF) > 9))
                                 {
-                                    wdat -= 6;
-                                    rdat |= 0x20;
+                                    data_reg -= 6;
+                                    data_flags |= 0x20;
                                 }
                                 
-                                if((rdat & 0x10))// || (((wdat >> 4) & 0x1F) > 9))
+                                if((data_flags & 0x10))// || (((wdat >> 4) & 0x1F) > 9))
                                 {
-                                    wdat -= 6 << 4;
-                                    rdat |= 0x10;
+                                    data_reg -= 6 << 4;
+                                    data_flags |= 0x10;
                                 }
                             }
                             
-                            rdat &= 0x50;
+                            data_flags &= 0x50;
                             
-                            wdat &= 0xFF;
-                            if(!wdat)
-                                rdat |= 0x80;
-                            mb->reg.A = wdat;
-                            mb->reg.F = rdat;
+                            data_reg &= 0xFF;
+                            if(!data_reg)
+                                data_flags |= 0x80;
+                            mb->reg.A = data_reg;
+                            mb->reg.F = data_flags;
                             
-                        #ifdef ENABLE_DAA_BYPASS
                             goto generic_fetch;
-                        #else
-                            return 0;
-                        #endif
                         
                         instr_057:
                         case 5: // CPL A
@@ -1236,29 +1254,29 @@ ATTR_HOT word mb_exec(self)
                     isrc = vIR & 7;
                     idst = (vIR >> 3) & 7;
                 #else
-                    isrc = column ^ 1;
-                    idst = row ^ 1;
+                    i_src = IR_column ^ 1;
+                    i_dst = IR_row ^ 1;
                 #endif
                 }
                 
-                if(isrc != 7)
+                if(i_src != 7)
                 {
-                    rdat = mb->reg.raw8[isrc];
+                    data_reg = mb->reg.raw8[i_src];
                 }
                 else
                 {
                     ++ncycles;
-                    rdat = mch_memory_dispatch_read(mb, mb->reg.HL);
+                    data_reg = mch_memory_dispatch_read(mb, mb->reg.HL);
                 }
                 
             generic_r8_write:
-                if(idst != 7)
+                if(i_dst != 7)
                 {
-                    mb->reg.raw8[idst] = rdat;
+                    mb->reg.raw8[i_dst] = data_reg;
                 }
                 else
                 {
-                    mch_memory_dispatch_write(mb, mb->reg.HL, rdat);
+                    mch_memory_dispatch_write(mb, mb->reg.HL, data_reg);
                     ++ncycles;
                 }
                 
@@ -1276,33 +1294,33 @@ ATTR_HOT word mb_exec(self)
             
             instr_ALU:
             
-            isrc = F_COL ^ 1;
+            i_src = F_COL ^ 1;
             
-            if(isrc != 7)
+            if(i_src != 7)
             {
-                rdat = mb->reg.raw8[isrc];
+                data_reg = mb->reg.raw8[i_src];
             }
             else
             {
                 ++ncycles;
-                rdat = mch_memory_dispatch_read(mb, mb->reg.HL);
+                data_reg = mch_memory_dispatch_read(mb, mb->reg.HL);
             }
             
             alu_op_begin:
-            rres = mb->reg.A;
+            data_result = mb->reg.A;
             
             switch(F_ROW)
             {
                 instr_ALU_0:
                 case 0: // ADD Z0HC
-                    mbh_fr_set_r8_add(mb, rres, rdat);
+                    mbh_fr_set_r8_add(mb, data_result, data_reg);
                     
                 instr_ALU_0_cont:
-                    rres = rres + rdat;
-                    if(rres >> 8)
-                        rflag = 0x10;
+                    data_result = data_result + data_reg;
+                    if(data_result >> 8)
+                        data_flags = 0x10;
                     else
-                        rflag = 0;
+                        data_flags = 0;
                     
                     
                     break;
@@ -1311,8 +1329,8 @@ ATTR_HOT word mb_exec(self)
                 case 1: // ADC Z0HC
                     if(mb->reg.F & 0x10)
                     {
-                        mbh_fr_set_r8_adc(mb, rres, rdat);
-                        rdat += 1;
+                        mbh_fr_set_r8_adc(mb, data_result, data_reg);
+                        data_reg += 1;
                         goto instr_ALU_0_cont;
                     }
                     else
@@ -1322,14 +1340,14 @@ ATTR_HOT word mb_exec(self)
                 
                 instr_ALU_2:
                 case 2: // SUB Z1HC
-                    mbh_fr_set_r8_sub(mb, rres, rdat);
+                    mbh_fr_set_r8_sub(mb, data_result, data_reg);
                     
                 instr_ALU_2_cont:
-                    rres = rres - rdat;
-                    if(rres >> 8)
-                        rflag = 0x50;
+                    data_result = data_result - data_reg;
+                    if(data_result >> 8)
+                        data_flags = 0x50;
                     else
-                        rflag = 0x40;
+                        data_flags = 0x40;
                     
                     break;
                 
@@ -1337,8 +1355,8 @@ ATTR_HOT word mb_exec(self)
                 case 3: // SBC Z1HC
                     if(mb->reg.F & 0x10)
                     {
-                        mbh_fr_set_r8_sbc(mb, rres, rdat);
-                        rdat += 1;
+                        mbh_fr_set_r8_sbc(mb, data_result, data_reg);
+                        data_reg += 1;
                         goto instr_ALU_2_cont;
                     }
                     else
@@ -1348,18 +1366,18 @@ ATTR_HOT word mb_exec(self)
                 
                  //instr_ALU_7:
                 case 7: // CMP Z1HC
-                    mbh_fr_set_r8_sub(mb, rres, rdat);
+                    mbh_fr_set_r8_sub(mb, data_result, data_reg);
                     
-                    rres = rres - rdat;
-                    if(rres >> 8)
-                        rflag = 0x50;
+                    data_result = data_result - data_reg;
+                    if(data_result >> 8)
+                        data_flags = 0x50;
                     else
-                        rflag = 0x40;
+                        data_flags = 0x40;
                     
-                    if(!(rres & 0xFF))
-                        rflag |=0x80;
+                    if(!(data_result & 0xFF))
+                        data_flags |=0x80;
                     
-                    mb->reg.F = rflag;
+                    mb->reg.F = data_flags;
                     
                     goto generic_fetch;
                 
@@ -1367,37 +1385,37 @@ ATTR_HOT word mb_exec(self)
                 case 4: // AND Z010
                     mb->FMC_MODE = 0;
                     
-                    rflag = 0x20;
-                    rres &= rdat;
+                    data_flags = 0x20;
+                    data_result &= data_reg;
                     break;
                 
                 //instr_ALU_5:
                 case 5: // XOR Z000
                     mb->FMC_MODE = 0;
                     
-                    rflag = 0;
-                    rres ^= rdat;
+                    data_flags = 0;
+                    data_result ^= data_reg;
                     break;
                 
                 //instr_ALU_6:
                 case 6: // ORR Z000
                     mb->FMC_MODE = 0;
                     
-                    rflag = 0;
-                    rres |= rdat;
+                    data_flags = 0;
+                    data_result |= data_reg;
                     break;
                 
                 default:
                     __builtin_unreachable();
             }
             
-            if(!(rres & 0xFF))
-                rflag |= 0x80;
+            if(!(data_result & 0xFF))
+                data_flags |= 0x80;
             
             {
                 hilow16_t sta;
-                sta.low = rres;
-                sta.high = rflag;
+                sta.low = data_result;
+                sta.high = data_flags;
                 mb->reg.hilo16[3] = sta;
             }
             
@@ -1405,28 +1423,28 @@ ATTR_HOT word mb_exec(self)
         }
         
         case 3: // Bottom bullshit
-            switch(column)
+            switch(IR_column)
             {
                 case 0: // misc junk and RET cc
                 {
-                    if(IR & 0x20) // misc junk
+                    if(IR & 0x20) // misc junk (bottom 4)
                     {
                         if(!(IR & 8)) // LDH n8
                         {
-                            wdat = 0xFF00 | mch_memory_fetch_PC(mb);
+                            data_wide = 0xFF00 | mch_memory_fetch_PC(mb);
                             
                             if(IR & 0x10)
                             {
                                 instr_360:
-                                DBGF("- /HR %04X -> ", wdat);
-                                mb->reg.A = mch_memory_dispatch_read_fexx_ffxx(mb, wdat);
+                                DBGF("- /HR %04X -> ", data_wide);
+                                mb->reg.A = mch_memory_dispatch_read_fexx_ffxx(mb, data_wide);
                                 DBGF("%02X\n", mb->reg.A);
                             }
                             else
                             {
                                 instr_340:
-                                DBGF("- /HW %04X <- %02X\n", wdat, mb->reg.A);
-                                mch_memory_dispatch_write_fexx_ffxx(mb, wdat, mb->reg.A);
+                                DBGF("- /HW %04X <- %02X\n", data_wide, mb->reg.A);
+                                mch_memory_dispatch_write_fexx_ffxx(mb, data_wide, mb->reg.A);
                             }
                             
                             ncycles += 2;
@@ -1434,36 +1452,35 @@ ATTR_HOT word mb_exec(self)
                         }
                         else
                         {
-                            //TODO: nobody uses the flags from this output, but still would be good if it actually got updated properly
                         instr_weird_r16_r8:
-                            wdat = mch_memory_fetch_PC(mb);
-                            if(wdat >= 0x80)
-                                wdat |= 0xFF00;
+                            data_wide = mch_memory_fetch_PC(mb);
+                            if(data_wide >= 0x80)
+                                data_wide |= 0xFF00;
                             
-                            rdat = mb->SP;
-                            mbh_fr_set_r16_add_r8(mb, rdat, wdat);
+                            data_reg = mb->SP;
+                            //mbh_fr_set_r16_add_r8(mb, data_reg, data_wide);
                             mb->FMC_MODE = 0; // fuck this, the call rate is so low that it's cheaper to do in-place
                             
-                            rflag = 0;
+                            data_flags = 0;
                             
-                            if(((wdat & 0xFF) + (rdat & 0xFF)) >> 8)
-                                rflag |= 0x10;
+                            if(((data_wide & 0xFF) + (data_reg & 0xFF)) >> 8)
+                                data_flags |= 0x10;
                             
-                            if(((wdat & 0xF) + (rdat & 0xF)) >> 4)
-                                rflag |= 0x20;
+                            if(((data_wide & 0xF) + (data_reg & 0xF)) >> 4)
+                                data_flags |= 0x20;
                             
-                            wdat = (wdat + rdat) & 0xFFFF;
+                            data_wide = (data_wide + data_reg) & 0xFFFF;
                             
-                            mb->reg.F = rflag;
+                            mb->reg.F = data_flags;
                             
                             if(IR & 0x10) // HL = SP + e8
                             {
-                                mb->reg.HL = wdat;
+                                mb->reg.HL = data_wide;
                                 ncycles += 2; // ???
                             }
                             else // SP = SP + e8
                             {
-                                mb->SP = wdat;
+                                mb->SP = data_wide;
                                 ncycles += 3; // ???
                             }
                             
@@ -1498,11 +1515,11 @@ ATTR_HOT word mb_exec(self)
                             generic_ret:
                             {
                                 var SP = mb->SP;
-                                wdat = mch_memory_dispatch_read(mb, SP++);
-                                wdat |= mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
+                                data_wide = mch_memory_dispatch_read(mb, SP++);
+                                data_wide |= mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
                                 mb->SP = SP;
                                 
-                                mb->PC = wdat;
+                                mb->PC = data_wide;
                                 
                                 ncycles += 2 + 1; // idk why penalty cycle
                                 goto generic_fetch;
@@ -1535,18 +1552,18 @@ ATTR_HOT word mb_exec(self)
                         instr_POP_r16:
                         
                         SP = mb->SP;
-                        wdat = mch_memory_dispatch_read(mb, SP++);
-                        wdat |= mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
+                        data_wide = mch_memory_dispatch_read(mb, SP++);
+                        data_wide |= mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
                         mb->SP = SP;
                         
-                        isrc = (IR >> 4) & 3;
-                        if(isrc != 3)
+                        i_src = (IR >> 4) & 3;
+                        if(i_src != 3)
                         {
-                            mb->reg.raw16[isrc] = wdat;
+                            mb->reg.raw16[i_src] = data_wide;
                         }
                         else
                         {
-                            MB_W_AF(wdat);
+                            MB_W_AF(data_wide);
                             mb->FMC_MODE = 0; // overwritten manually
                         }
                         
@@ -1560,36 +1577,36 @@ ATTR_HOT word mb_exec(self)
                     {
                         if(IR & 8)
                         {
-                            wdat = mch_memory_fetch_PC_2(mb);
+                            data_wide = mch_memory_fetch_PC_2(mb);
                             
                             if(IR & 0x10)
                             {
                                 instr_372:
-                                mb->reg.A = mch_memory_dispatch_read(mb, wdat);
+                                mb->reg.A = mch_memory_dispatch_read(mb, data_wide);
                             }
                             else
                             {
                                 instr_352:
-                                mch_memory_dispatch_write(mb, wdat, mb->reg.A);
+                                mch_memory_dispatch_write(mb, data_wide, mb->reg.A);
                             }
                             
                             ncycles += 2 + 1;
                         }
                         else
                         {
-                            wdat = 0xFF00 | mb->reg.C;
+                            data_wide = 0xFF00 | mb->reg.C;
                             
                             if(!(IR & 0x10))
                             {
                                 instr_342:
-                                DBGF("- /HW %04X <- %02X\n", wdat, mb->reg.A);
-                                mch_memory_dispatch_write_fexx_ffxx(mb, wdat, mb->reg.A);
+                                DBGF("- /HW %04X <- %02X\n", data_wide, mb->reg.A);
+                                mch_memory_dispatch_write_fexx_ffxx(mb, data_wide, mb->reg.A);
                             }
                             else
                             {
                                 instr_362:
-                                DBGF("- /HR %04X -> ", wdat);
-                                mb->reg.A = mch_memory_dispatch_read_fexx_ffxx(mb, wdat);
+                                DBGF("- /HR %04X -> ", data_wide);
+                                mb->reg.A = mch_memory_dispatch_read_fexx_ffxx(mb, data_wide);
                                 DBGF("%02X\n", mb->reg.A);
                             }
                             
@@ -1623,8 +1640,8 @@ ATTR_HOT word mb_exec(self)
                         case 0: // JP n16
                         generic_jp_abs:
                         {
-                            wdat = mch_memory_fetch_PC_2(mb);
-                            mb->PC = wdat;
+                            data_wide = mch_memory_fetch_PC_2(mb);
+                            mb->PC = data_wide;
                             ncycles += 2 + 1; // idk why penalty cycle
                             goto generic_fetch;
                         }
@@ -1677,24 +1694,24 @@ ATTR_HOT word mb_exec(self)
                 {
                     if(!(IR & 8)) // PUSH r16
                     {
-                        isrc = (IR >> 4) & 3;
-                        if(isrc != 3)
+                        i_src = (IR >> 4) & 3;
+                        if(i_src != 3)
                         {
-                            wdat = mb->reg.raw16[isrc];
+                            data_wide = mb->reg.raw16[i_src];
                         }
                         else
                         {
                             mb->reg.F = mbh_fr_get(mb, mb->reg.F);
                             
-                            wdat = MB_R_AF;
+                            data_wide = MB_R_AF;
                         }
                         
                     generic_push:
                         if(1)
                         {
                             var SP = mb->SP;
-                            mch_memory_dispatch_write(mb, (--SP) & 0xFFFF, wdat >> 8);
-                            mch_memory_dispatch_write(mb, (--SP) & 0xFFFF, wdat & 0xFF);
+                            mch_memory_dispatch_write(mb, (--SP) & 0xFFFF, data_wide >> 8);
+                            mch_memory_dispatch_write(mb, (--SP) & 0xFFFF, data_wide & 0xFF);
                             mb->SP = SP;
                             ncycles += 2 + 1; // IDU can't pre-decrement, one penalty cycle
                         }
@@ -1703,14 +1720,14 @@ ATTR_HOT word mb_exec(self)
                     }
                     else
                     {
-                        if(row == 1) // CALL n16
+                        if(IR_row == 1) // CALL n16
                         {
                         generic_call:
                         {
                             var PC = mb->PC;
-                            wdat = mch_memory_fetch_PC_2(mb);
-                            mb->PC = wdat;
-                            wdat = (PC + 2) & 0xFFFF;
+                            data_wide = mch_memory_fetch_PC_2(mb);
+                            mb->PC = data_wide;
+                            data_wide = (PC + 2) & 0xFFFF;
                             ncycles += 2;
                             
                             goto generic_push;
@@ -1727,14 +1744,14 @@ ATTR_HOT word mb_exec(self)
                 {
                     instr_3x6:
                     ++ncycles;
-                    rdat = mch_memory_fetch_PC(mb);
+                    data_reg = mch_memory_fetch_PC(mb);
                     goto alu_op_begin;
                 }
                 
                 case 7: // RST
                 {
                     instr_3x7:
-                    wdat = mb->PC;
+                    data_wide = mb->PC;
                     mb->PC = IR & (7 << 3);
                     goto generic_push;
                 }
@@ -1778,91 +1795,91 @@ ATTR_HOT word mb_exec(self)
         }
     #endif
     
-        isrc = (CBIR >> 3) & 7;
-        idst = (CBIR & 7) ^ 1;
+        i_src = (CBIR >> 3) & 7;
+        i_dst = (CBIR & 7) ^ 1;
         
-        if(idst != 7)
-            rdat = mb->reg.raw8[idst];
+        if(i_dst != 7)
+            data_reg = mb->reg.raw8[i_dst];
         else
         {
             ++ncycles;
-            rdat = mch_memory_dispatch_read(mb, mb->reg.HL);
+            data_reg = mch_memory_dispatch_read(mb, mb->reg.HL);
         }
         
         switch(CBIR >> 6)
         {
             case 0: // CB OP
-                rflag = mb->reg.F;
-                rflag &= 0x10;
+                data_flags = mb->reg.F;
+                data_flags &= 0x10;
                 
-                switch(isrc)
+                switch(i_src)
                 {
                     case 0: // RLC
-                        rdat = (rdat << 1) | (rdat >> 7);
-                        rflag = (rdat >> 4) & 0x10;
+                        data_reg = (data_reg << 1) | (data_reg >> 7);
+                        data_flags = (data_reg >> 4) & 0x10;
                         break;
                     
                     case 1: // RRC
-                        rdat = (rdat << 7) | (rdat >> 1);
-                        rflag = (rdat >> 3) & 0x10;
+                        data_reg = (data_reg << 7) | (data_reg >> 1);
+                        data_flags = (data_reg >> 3) & 0x10;
                         break;
                     
                     case 2: // RL
-                        rdat = (rdat << 1) | ((rflag >> 4) & 1);
-                        rflag = (rdat >> 4) & 0x10;
+                        data_reg = (data_reg << 1) | ((data_flags >> 4) & 1);
+                        data_flags = (data_reg >> 4) & 0x10;
                         break;
                     
                     case 3: // RR
-                        rdat = (rdat << 8) | (rdat >> 1) | ((rflag & 0x10) << 3);
-                        rflag = (rdat >> 4) & 0x10;
+                        data_reg = (data_reg << 8) | (data_reg >> 1) | ((data_flags & 0x10) << 3);
+                        data_flags = (data_reg >> 4) & 0x10;
                         break;
                     
                     case 4: // LSL
-                        rdat = (rdat << 1);
-                        rflag = (rdat >> 4) & 0x10;
+                        data_reg = (data_reg << 1);
+                        data_flags = (data_reg >> 4) & 0x10;
                         break;
                     
                     case 5: // ASR
-                        rflag = (rdat & 1) << 4;
-                        rdat = (rdat >> 1) | (rdat & 0x80);
+                        data_flags = (data_reg & 1) << 4;
+                        data_reg = (data_reg >> 1) | (data_reg & 0x80);
                         break;
                     
                     case 6: // SWAP
-                        rflag = 0;
-                        rdat = (rdat >> 4) | (rdat << 4);
+                        data_flags = 0;
+                        data_reg = (data_reg >> 4) | (data_reg << 4);
                         break;
                     
                     case 7: // LSR
-                        rflag = (rdat & 1) << 4;
-                        rdat = (rdat >> 1);
+                        data_flags = (data_reg & 1) << 4;
+                        data_reg = (data_reg >> 1);
                         break;
                 }
                 
-                rdat &= 0xFF;
-                if(!rdat)
-                    rflag |= 0x80;
+                data_reg &= 0xFF;
+                if(!data_reg)
+                    data_flags |= 0x80;
                 
-                mb->reg.F = rflag;
+                mb->reg.F = data_flags;
                 goto cb_writeback;
             
             case 1: // BTT
-                rflag = mb->reg.F;
+                data_flags = mb->reg.F;
                 
-                if(rdat & (1 << isrc))
-                    rflag = (rflag & 0x10) | 0x20;
+                if(data_reg & (1 << i_src))
+                    data_flags = (data_flags & 0x10) | 0x20;
                 else
-                    rflag = (rflag & 0x10) | 0xA0;
+                    data_flags = (data_flags & 0x10) | 0xA0;
                 
-                mb->reg.F = rflag;
+                mb->reg.F = data_flags;
                 
                 goto generic_fetch;
             
             case 2: // RES
-                rdat &= ~(1 << isrc);
+                data_reg &= ~(1 << i_src);
                 goto cb_writeback;
             
             case 3: // SET
-                rdat |= (1 << isrc);
+                data_reg |= (1 << i_src);
                 goto cb_writeback;
         }
         
@@ -1870,11 +1887,11 @@ ATTR_HOT word mb_exec(self)
         
         cb_writeback:
         
-        if(idst != 7)
-            mb->reg.raw8[idst] = rdat;
+        if(i_dst != 7)
+            mb->reg.raw8[i_dst] = data_reg;
         else
         {
-            mch_memory_dispatch_write(mb, mb->reg.HL, rdat);
+            mch_memory_dispatch_write(mb, mb->reg.HL, data_reg);
             ++ncycles;
         }
         
@@ -1882,6 +1899,8 @@ ATTR_HOT word mb_exec(self)
     }
     return 0; // WTF
 }
+
+#pragma region Memory interface cache operations
 
 void micache_invalidate(struct mb_mi_cache* __restrict mic)
 {
@@ -1910,3 +1929,5 @@ void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word start, wo
     }
     while(++i <= ends);
 }
+
+#pragma endregion

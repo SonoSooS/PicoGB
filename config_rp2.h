@@ -5,7 +5,6 @@
 //#define CONFIG_DBG
 //#define CONFIG_DBG_IO
 //#define GBA
-#define ENABLE_DAA_BYPASS
 //#define PPU_SCANLINE_UPDATES
 //#define CONFIG_DOCTOR
 //#define CONFIG_LYC_90
