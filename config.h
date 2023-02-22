@@ -20,7 +20,7 @@
 #define CONFIG_NOBOOTMEME
 //#define CONFIG_IS_CGB
 #define CONFIG_PPU_CGB_MONO
-#define CONFIG_VSYNC 0
+#define CONFIG_VSYNC 2
 #define CONFIG_PPU_INVERT
 //#define CONFIG_APU_ENABLE
 #define CONFIG_APU_RICH
@@ -29,7 +29,7 @@
 // 0 - none
 // 1 - record
 // 2 - playback
-#define CONFIG_TAS 2
+#define CONFIG_TAS 0
 
 // 0 - default 32bit full-color
 // 1 - 1bpp jankdither globally fixed
