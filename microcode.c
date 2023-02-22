@@ -28,6 +28,8 @@
 
 #pragma region Microcode I/O
 
+#pragma region Fabric interface
+
 static const r8* mch_resolve_mic_read_internal(const self, word addr)
 {
     //TODO: unfuck this entire thing
@@ -134,6 +136,10 @@ static r8* mch_resolve_mic_write_internal(const self, word addr)
     return 0;
 }
 
+#pragma endregion
+
+#pragma region Resolve direct I/O
+
 static inline const r8* mch_resolve_mic_read(self, word addr)
 {
     USE_MIC;
@@ -197,6 +203,10 @@ static inline r8* mch_resolve_mic_write(self, word addr)
     return 0;
 }
 
+#pragma endregion
+
+#pragma region Direct I/O
+
 static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
 {
     if(addr >= 0xFF80)
@@ -244,6 +254,10 @@ static inline void mch_memory_dispatch_write_ROM(const self, word addr, word dat
 {
     mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, 1);
 }
+
+#pragma endregion
+
+#pragma region Dispatch
 
 ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
 {
@@ -380,6 +394,8 @@ ATTR_HOT static word mch_memory_fetch_PC_2(self)
     DBGF("- /M2 %04X <> %04X\n", addr_orig, resp);
     return resp;
 }
+
+#pragma endregion
 
 #pragma endregion
 
@@ -540,7 +556,7 @@ static word mbh_cc_check(word IR, word F)
 static const char* str_r8[8] = {"B", "C", "D", "E", "H", "L", "[HL]", "A"};
 static const char* str_aluop[8] = {"ADD", "ADC", "SUB", "SBC", "AND", "XOR", "ORR", "CMP"};
 
-void disasm(const struct mb_state* __restrict mb)
+void mb_disasm(const struct mb_state* __restrict mb)
 {
     var IR = mb->IR.low;
     
@@ -561,7 +577,7 @@ void disasm(const struct mb_state* __restrict mb)
 static const char* str_cbop[4] = {0, "BIT", "SET", "RES"};
 static const char* str_cbop0[8] = {"ROL", "ROR", "RCL", "RCR", "LSL", "ASR", "SWAP", "LSR"};
 
-void disasm_CB(const struct mb_state* __restrict mb, word CBIR)
+void mb_disasm_CB(const struct mb_state* __restrict mb, word CBIR)
 {
     var IR = CBIR;
     
@@ -646,7 +662,7 @@ ATTR_HOT word mb_exec(self)
     if(_IS_DBG)
     {
         DBGF("Instruction %02X (%01o:%01o:%01o) ", IR, IR >> 6, IR & 7, (IR >> 3) & 7);
-        disasm(mb);
+        mb_disasm(mb);
     }
 #endif
     
@@ -1791,7 +1807,7 @@ ATTR_HOT word mb_exec(self)
         if(_IS_DBG)
         {
             printf("               (%01o:%01o:%01o) ", CBIR >> 6, CBIR & 7, (CBIR >> 3) & 7);
-            disasm_CB(mb, CBIR);
+            mb_disasm_CB(mb, CBIR);
         }
     #endif
     

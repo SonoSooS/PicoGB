@@ -3,8 +3,8 @@
 #include "types.h"
 
 
-typedef word(*pmiDispatch)(void* userdata,word addr,word data,word type);
-typedef word(*pmiDispatchBank)(void* userdata,word bank);
+typedef word(*pmiDispatch)(void* userdata, word addr, word data, word type);
+typedef const r8* (*pmiDispatchBank)(void* userdata, word addr, word bank);
 
 struct mi_dispatch
 {
@@ -28,4 +28,11 @@ struct mi_dispatch
     pmiDispatch dispatch_ROM;
     pmiDispatch dispatch_IO;
     pmiDispatchBank dispatch_ROM_Bank;
+    
+    r8 ROM_MAPPER;
 };
+
+static inline void mi_params_from_header(struct mi_dispatch* mi, const r8* __restrict ROM)
+{
+    mi->ROM_MAPPER = ROM[0x147];
+}

@@ -147,8 +147,8 @@ static void regdump(const struct mb_state* __restrict mb)
 
 word cb_IO(void* userdata, word addr, word data, word type)
 {
-    if(addr == 0xFF44) return cb_IO_(userdata, addr, data, type);
-    if(addr == 0xFF41) return cb_IO_(userdata, addr, data, type);
+    if(addr == 0xFF44) return pgf_cb_IO_(userdata, addr, data, type);
+    if(addr == 0xFF41) return pgf_cb_IO_(userdata, addr, data, type);
     
 #if CONFIG_DBG_IO
     if(!type)
@@ -156,7 +156,7 @@ word cb_IO(void* userdata, word addr, word data, word type)
     else
         printf("- /WR %04X <- %02X | ", addr, data);
 #endif
-    word res = cb_IO_(userdata, addr, data, type);
+    word res = pgf_cb_IO_(userdata, addr, data, type);
 #if CONFIG_DBG_IO
     printf("%02X\n", res);
 #endif
@@ -174,7 +174,7 @@ word cb_ROM(void* userdata, word addr, word data, word type)
     else
         printf("- /MW %04X <- %02X | ", addr, data);
 #endif
-    word res = cb_ROM_(userdata, addr, data, type);
+    word res = pgf_cb_ROM_(userdata, addr, data, type);
 #if CONFIG_DBG_IO
     printf("%02X\n", res);
 #endif
@@ -312,7 +312,7 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             
             if(nbit)
             {
-                struct userdata_t* __restrict ud = (struct userdata_t* __restrict)GetWindowLongPtrW(wnd, 0);
+                struct pgf_userdata_t* __restrict ud = (struct pgf_userdata_t* __restrict)GetWindowLongPtrW(wnd, 0);
                 
                 if(!(lParam & (1 << 31)))
                 {
@@ -334,7 +334,7 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             PAINTSTRUCT pstr;
             HDC dc = BeginPaint(wnd, &pstr);
             
-            const struct userdata_t* __restrict ud = (const struct userdata_t* __restrict)GetWindowLongPtrW(wnd, 0);
+            const struct pgf_userdata_t* __restrict ud = (const struct pgf_userdata_t* __restrict)GetWindowLongPtrW(wnd, 0);
             
             DWORD buf[(sizeof(BITMAPINFOHEADER) + (4 * sizeof(RGBQUAD))) / sizeof(DWORD)];
             BITMAPINFOHEADER* bmi = (BITMAPINFOHEADER*)buf;
@@ -418,7 +418,7 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
     return DefWindowProcW(wnd, uMsg, wParam, lParam);
 }
 
-static HWND wnd_create(const struct userdata_t* __restrict ud)
+static HWND wnd_create(const struct pgf_userdata_t* __restrict ud)
 {
     const LPCWSTR WClassName = L"PicoGB_Main";
     
@@ -569,7 +569,7 @@ static DWORD cnto = N_OUT;
 #endif
 
 
-static struct userdata_t userdata;
+static struct pgf_userdata_t userdata;
 static struct mi_dispatch dis;
 static struct mb_state mb;
 static struct ppu_t pp;
@@ -694,6 +694,7 @@ int main(int argc, char** argv)
         
         mb.mi = &dis;
         micache_invalidate(&mb.micache);
+        mi_params_from_header(mb.mi, rommap[0]);
         
         mb.IE = 0;
         mb.IF = 0;
@@ -1051,7 +1052,7 @@ int main(int argc, char** argv)
         //TODO: 17556 samples per frame
         
         mb.DIV += cycles;
-        timer_update(&userdata, cycles);
+        pgf_timer_update(&userdata, cycles);
         
         #if CONFIG_APU_ENABLE
         if(hwow)

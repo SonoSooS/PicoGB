@@ -63,7 +63,7 @@ struct mb_state
 typedef struct mb_state mb_state;
 
 word mb_exec(mb_state* __restrict);
-void disasm(const mb_state* __restrict);
+void mb_disasm(const mb_state* __restrict);
 
 
 void micache_invalidate(struct mb_mi_cache* __restrict mic);

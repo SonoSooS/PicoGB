@@ -9,7 +9,7 @@
 #define USE_UD struct userdata_t* __restrict ud = (struct userdata_t* __restrict)userdata;
 
 
-void timer_update_internal(struct userdata_t* __restrict ud, word ticks)
+void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
 {
     //if(!(ud->TIMER_CNT & 4))
     //    return;
@@ -66,7 +66,26 @@ void timer_update_internal(struct userdata_t* __restrict ud, word ticks)
     ud->TIMER_SUB = nres;
 }
 
-word cb_IO_(void* userdata, word addr, word data, word type)
+static const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
+{
+    const r8* res = 0;
+    
+    USE_UD;
+    
+    if(addr < 0x4000)
+        bank = 0;
+    
+    if(ud->mb->mi->ROM)
+    {
+        res = ud->mb->mi->ROM[bank];
+        if(res)
+            return &res[addr & 0x3FFF];
+    }
+    
+    return 0;
+}
+
+word pgf_cb_IO_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
@@ -224,13 +243,13 @@ word cb_IO_(void* userdata, word addr, word data, word type)
                         case 1:
                         case 2:
                         case 3:
-                            SRC = &ud->mb->mi->ROM[0][wb];
+                            SRC = pgf_resolve_ROM(userdata, wb, 0);
                             break;
                         case 4:
                         case 5:
                         case 6:
                         case 7:
-                            SRC = &ud->mb->mi->ROM[ud->mb->mi->BANK_ROM][(wb & 0x3F00)];
+                            SRC = pgf_resolve_ROM(userdata, wb, ud->mb->mi->BANK_ROM);
                             break;
                         case 8:
                         case 9:
@@ -428,7 +447,7 @@ word cb_IO_(void* userdata, word addr, word data, word type)
     return 0xFF;
 }
 
-const word mappers[0x20] =
+static const word mappers[0x20] =
 {
     0, 1, 1, 1,
     0, 2, 2, 0,
@@ -440,11 +459,11 @@ const word mappers[0x20] =
     5, 5, 5, 0
 };
 
-word cb_ROM_(void* userdata, word addr, word data, word type)
+word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
-    var mapper = ud->mb->mi->ROM[0][0x147];
+    var mapper = ud->mb->mi->ROM_MAPPER;
     assert(mapper < 0x20);
     var lut = mappers[mapper];
     switch(lut)

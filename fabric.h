@@ -5,7 +5,9 @@
 #include "ppu.h"
 #include "apu.h"
 
-struct userdata_t
+#define USE_UD struct pgf_userdata_t* __restrict ud = (struct pgf_userdata_t* __restrict)userdata;
+
+struct pgf_userdata_t
 {
     struct mb_state* __restrict mb;
     struct ppu_t* __restrict ppu;
@@ -22,14 +24,14 @@ struct userdata_t
 };
 
 
-void timer_update_internal(struct userdata_t* __restrict ud, word ticks);
-word cb_ROM_(void* userdata, word addr, word data, word type);
-word cb_IO_(void* userdata, word addr, word data, word type);
+void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks);
+word pgf_cb_ROM_(void* userdata, word addr, word data, word type);
+word pgf_cb_IO_(void* userdata, word addr, word data, word type);
 
-static inline void timer_update(struct userdata_t* __restrict ud, word ticks)
+static inline void pgf_timer_update(struct pgf_userdata_t* __restrict ud, word ticks)
 {
     if(!(ud->TIMER_CNT & 4))
         return;
     
-    timer_update_internal(ud, ticks);
+    pgf_timer_update_internal(ud, ticks);
 }
