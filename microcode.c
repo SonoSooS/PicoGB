@@ -30,6 +30,17 @@
 
 #pragma region Fabric interface
 
+#if CONFIG_ENABLE_LRU
+static inline const r8* mch_resolve_mic_bank_internal(const self, word addr)
+{
+    USE_MI;
+    
+    const r8* ret = mi->dispatch_ROM_Bank(mi->userdata, addr, mi->BANK_ROM);
+    
+    return ret;
+}
+#endif
+
 static const r8* mch_resolve_mic_read_internal(const self, word addr)
 {
     //TODO: unfuck this entire thing
@@ -41,15 +52,31 @@ static const r8* mch_resolve_mic_read_internal(const self, word addr)
     var r_addr = MICACHE_R_VALUE(addr);
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
-        if(r_addr < MICACHE_R_VALUE(0x4000))
+    #if CONFIG_ENABLE_LRU
+        if(mi->ROM)
+    #endif
         {
-            return &(mi->ROM[0][addr & ~MICACHE_R_SEL]);
+            if(r_addr < MICACHE_R_VALUE(0x4000))
+            {
+                ret = mi->ROM[0];
+                if(ret)
+                    return &ret[addr & ~MICACHE_R_SEL];
+            }
+            else
+            {
+                ret = mi->ROM[mi->BANK_ROM];
+                if(ret)
+                {
+                    addr &= 0x3FFF;
+                    return &ret[addr & ~MICACHE_R_SEL];
+                }
+            }
         }
-        else
-        {
-            addr &= 0x3FFF;
-            return &(mi->ROM[mi->BANK_ROM][addr & ~MICACHE_R_SEL]);
-        }
+        
+    #if CONFIG_ENABLE_LRU
+        ret = mch_resolve_mic_bank_internal(mb, addr & ~MICACHE_R_SEL);
+    #endif
+        return ret;
     }
     else if(r_addr < MICACHE_R_VALUE(0xA000))
     {

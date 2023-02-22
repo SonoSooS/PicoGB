@@ -5,8 +5,9 @@
 #include "fabric.h"
 #include "dbg.h"
 
-
-#define USE_UD struct userdata_t* __restrict ud = (struct userdata_t* __restrict)userdata;
+#if CONFIG_ENABLE_LRU
+#include "lru.h"
+#endif
 
 
 void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
@@ -81,6 +82,12 @@ static const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
         if(res)
             return &res[addr & 0x3FFF];
     }
+    
+#if CONFIG_ENABLE_LRU
+    res = ud->mb->mi->dispatch_ROM_Bank(userdata, addr & ~MICACHE_R_SEL, bank);
+    if(res)
+        return &res[((addr & 0x3FFF) & ~MICACHE_R_SEL) + (addr & MICACHE_R_SEL)];
+#endif
     
     return 0;
 }
@@ -564,3 +571,40 @@ word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
     
     return 0xFF;
 }
+
+#if CONFIG_ENABLE_LRU
+const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
+{
+    USE_UD;
+    
+    struct mi_dispatch_ROM_Bank* dispatch_ROM_Bank = (struct mi_dispatch_ROM_Bank*)ud->mb->mi->userdata_ROM_Bank;
+    
+    if(addr < 0x4000)
+        bank = 0;
+    
+    var isnew = 0;
+    struct lru_slot* slot = lru_get_write(dispatch_ROM_Bank->lru, addr, bank, &isnew);
+    if(slot)
+    {
+        if(isnew)
+        {
+            var i;
+            //printf("! LRU update %02X:%04X\n", bank, addr);
+            
+            micache_invalidate_range(&ud->mb->micache, slot->token_address, slot->token_address + 2);
+            micache_invalidate_range(&ud->mb->micache, addr, addr + 2);
+            
+            lru_update_slot(slot, addr, bank);
+            
+            const r8* dataptr = dispatch_ROM_Bank->dispatch(dispatch_ROM_Bank->userdata, addr, bank);
+            
+            for(i = 0; i < (1 << MICACHE_R_BITS); i++)
+                slot->data[i] = dataptr[i];
+        }
+        
+        return slot->data;
+    }
+    
+    return 0;
+}
+#endif

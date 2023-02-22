@@ -2,9 +2,22 @@
 
 #include "types.h"
 
+#if CONFIG_ENABLE_LRU
+#include "lru.h"
+#endif
 
 typedef word(*pmiDispatch)(void* userdata, word addr, word data, word type);
 typedef const r8* (*pmiDispatchBank)(void* userdata, word addr, word bank);
+
+
+#if CONFIG_ENABLE_LRU
+struct mi_dispatch_ROM_Bank
+{
+    struct lru_state* lru;
+    void* userdata;
+    pmiDispatchBank dispatch;
+};
+#endif
 
 struct mi_dispatch
 {
@@ -27,7 +40,11 @@ struct mi_dispatch
     void* userdata;
     pmiDispatch dispatch_ROM;
     pmiDispatch dispatch_IO;
+    
+#if CONFIG_ENABLE_LRU
+    void* userdata_ROM_Bank;
     pmiDispatchBank dispatch_ROM_Bank;
+#endif
     
     r8 ROM_MAPPER;
 };

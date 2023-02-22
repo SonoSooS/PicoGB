@@ -24,6 +24,7 @@
 //#define CONFIG_APU_ENABLE
 #define CONFIG_APU_RICH
 #define CONFIG_APU_MONO
+//#define CONFIG_ENABLE_LRU
 
 // 0 - none
 // 1 - record
@@ -185,4 +186,11 @@
 
 #ifndef PPU_INTERLACE
 #define PPU_INTERLACE 0
+#endif
+
+#ifndef CONFIG_ENABLE_LRU
+#define CONFIG_ENABLE_LRU 0
+#else
+#undef CONFIG_ENABLE_LRU
+#define CONFIG_ENABLE_LRU 1
 #endif

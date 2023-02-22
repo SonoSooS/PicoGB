@@ -13,18 +13,20 @@
 #include "ppu.h"
 #include "fabric.h"
 
+#include "lru.h"
+
 
 #if CONFIG_DBG
 var _IS_DBG;
 #endif
 
-const char* rompath = "../testrom.gb";
+//const char* rompath = "../testrom.gb";
 //const char* rompath = "../testrom_cgb.gbc";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Castlevania - The Adventure (Europe).gb";
 //const char* rompath = "C:\\Downloads\\dmg-acid2.gb";
 //const char* rompath = "C:\\Downloads\\DebugYellow.gbc";
 //const char* rompath = "C:\\Downloads\\game.gb";
-//const char* rompath = "C:\\Downloads\\cpu_instrs.gb";
+const char* rompath = "C:\\Downloads\\cpu_instrs.gb";
 //const char* rompath = "C:\\Downloads\\03-op sp,hl.gb";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Castlevania - The Adventure (Europe).gb";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Felix the Cat (USA, Europe).gb";
@@ -578,6 +580,31 @@ static const r8* __restrict rommap[512];
 
 static pixel_t* __restrict fb_lines[145];
 
+#if CONFIG_ENABLE_LRU
+static struct lru_slot lru_slots[32];
+static struct lru_state lru =
+{
+    .slots = &lru_slots[0],
+    .slots_count = sizeof(lru_slots) / sizeof(lru_slots[0])
+};
+static r8 lru_bufs[sizeof(lru_slots) / sizeof(lru_slots[0])][1 << MICACHE_R_BITS];
+struct mi_dispatch_ROM_Bank lru_dispatch;
+
+const r8* cb_ROM_LRU(void* userdata, word addr, word bank)
+{
+    const r8* __restrict dataptr = rommap[bank];
+    if(dataptr)
+    {
+        dataptr = &dataptr[(addr & 0x3FFF) & ~MICACHE_R_SEL];
+        return dataptr;
+    }
+    
+    puts("!!! BAD LRU");
+    
+    return 0;
+}
+#endif
+
 //#define F(offs,fld) if(offsetof(mb_state,fld)!=offs) {printf("&" #fld " != " #offs " (%u)\n", offsetof(mb_state,fld));assert(offsetof(mb_state, fld) == offs);}
 int main(int argc, char** argv)
 {
@@ -689,7 +716,23 @@ int main(int argc, char** argv)
         for(i = 0; i != (fs >> 14); i++)
             rommap[i] = &img[i << 14];
         
+    #if !CONFIG_ENABLE_LRU
         dis.ROM = rommap;
+    #else
+        dis.ROM = 0;
+        dis.dispatch_ROM_Bank = cb_ROM_LRU;
+        lru.slots = &lru_slots[0];
+        lru.slots_count = sizeof(lru_slots) / sizeof(lru_slots[0]);
+        for(i = 0; i != lru.slots_count; i++)
+            lru_slots[i].data = &lru_bufs[i][0];
+        lru_init(&lru);
+        lru_dispatch.lru = &lru;
+        lru_dispatch.userdata = 0;
+        lru_dispatch.dispatch =  cb_ROM_LRU;
+        dis.dispatch_ROM_Bank = pgf_cb_ROM_LRU_;
+        dis.userdata_ROM_Bank = (void*)&lru_dispatch;
+    #endif
+        
         dis_alloc(&dis);
         
         mb.mi = &dis;

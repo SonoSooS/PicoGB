@@ -28,6 +28,10 @@ void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
 word pgf_cb_ROM_(void* userdata, word addr, word data, word type);
 word pgf_cb_IO_(void* userdata, word addr, word data, word type);
 
+#if CONFIG_ENABLE_LRU
+const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank);
+#endif
+
 static inline void pgf_timer_update(struct pgf_userdata_t* __restrict ud, word ticks)
 {
     if(!(ud->TIMER_CNT & 4))
