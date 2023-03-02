@@ -194,3 +194,11 @@
 #undef CONFIG_ENABLE_LRU
 #define CONFIG_ENABLE_LRU 1
 #endif
+
+#ifndef PGB_FUNC
+#define PGB_FUNC
+#endif
+
+#ifndef PGB_DATA
+#define PGB_DATA
+#endif

@@ -14,7 +14,7 @@ struct pgf_userdata_t
     struct apu_t* __restrict apu;
     void* _resvd;
     
-    var JOYP_RAW; // A is $10, Right is $01
+    var JOYP_RAW; // A is $01, Right is $10
     var JOYP;
     
     var TIMER_SUB;

@@ -7,6 +7,8 @@
 typedef unsigned char pixel_t;
 #elif PPU_MODE == 4
 typedef unsigned char pixel_t;
+#elif PPU_MODE == 6
+typedef unsigned short pixel_t;
 #else
 typedef unsigned int pixel_t;
 #endif

@@ -31,7 +31,7 @@
 #pragma region Fabric interface
 
 #if CONFIG_ENABLE_LRU
-static inline const r8* mch_resolve_mic_bank_internal(const self, word addr)
+PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word addr)
 {
     USE_MI;
     
@@ -41,7 +41,7 @@ static inline const r8* mch_resolve_mic_bank_internal(const self, word addr)
 }
 #endif
 
-static const r8* mch_resolve_mic_read_internal(const self, word addr)
+PGB_FUNC static const r8* mch_resolve_mic_read_internal(const self, word addr)
 {
     //TODO: unfuck this entire thing
     
@@ -114,7 +114,7 @@ static const r8* mch_resolve_mic_read_internal(const self, word addr)
     return 0;
 }
 
-static r8* mch_resolve_mic_write_internal(const self, word addr)
+PGB_FUNC static r8* mch_resolve_mic_write_internal(const self, word addr)
 {
     //TODO: unfuck this entire thing
     
@@ -167,7 +167,7 @@ static r8* mch_resolve_mic_write_internal(const self, word addr)
 
 #pragma region Resolve direct I/O
 
-static inline const r8* mch_resolve_mic_read(self, word addr)
+PGB_FUNC static inline const r8* mch_resolve_mic_read(self, word addr)
 {
     USE_MIC;
     
@@ -188,7 +188,7 @@ static inline const r8* mch_resolve_mic_read(self, word addr)
     return 0;
 }
 
-static inline const r8* mch_resolve_mic_execute(self, word addr)
+PGB_FUNC static inline const r8* mch_resolve_mic_execute(self, word addr)
 {
     USE_MIC;
     
@@ -209,7 +209,7 @@ static inline const r8* mch_resolve_mic_execute(self, word addr)
     return 0;
 }
 
-static inline r8* mch_resolve_mic_write(self, word addr)
+PGB_FUNC static inline r8* mch_resolve_mic_write(self, word addr)
 {
     USE_MIC;
     
@@ -234,7 +234,7 @@ static inline r8* mch_resolve_mic_write(self, word addr)
 
 #pragma region Direct I/O
 
-static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
+PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
 {
     if(addr >= 0xFF80)
     {
@@ -254,7 +254,7 @@ static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     return mb->mi->dispatch_IO(mb->mi->userdata, addr, 0, 0);
 }
 
-static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
+PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
 {
     if(addr >= 0xFF80)
     {
@@ -277,7 +277,7 @@ static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
     mb->mi->dispatch_IO(mb->mi->userdata, addr, data, 1);
 }
 
-static inline void mch_memory_dispatch_write_ROM(const self, word addr, word data)
+PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self, word addr, word data)
 {
     mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, 1);
 }
@@ -286,7 +286,7 @@ static inline void mch_memory_dispatch_write_ROM(const self, word addr, word dat
 
 #pragma region Dispatch
 
-ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
+PGB_FUNC ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
 {
     if(addr < 0xE000)
     {
@@ -306,7 +306,7 @@ ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
 }
 
 #if CONFIG_DBG
-static word mch_memory_dispatch_read(self, word addr)
+PGB_FUNC static word mch_memory_dispatch_read(self, word addr)
 {
     DBGF("- /RD %04X -> ", addr);
     word res = mch_memory_dispatch_read_(mb, addr);
@@ -317,7 +317,7 @@ static word mch_memory_dispatch_read(self, word addr)
 #define mch_memory_dispatch_read mch_memory_dispatch_read_
 #endif
 
-static void mch_memory_dispatch_write(self, word addr, word data)
+PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 {
     DBGF("- /WR %04X <- %02X\n", addr, data);
     
@@ -353,7 +353,7 @@ static void mch_memory_dispatch_write(self, word addr, word data)
     }
 }
 
-static inline word mch_memory_fetch_decode_1(self, word addr)
+PGB_FUNC static inline word mch_memory_fetch_decode_1(self, word addr)
 {
     if(addr < 0xE000)
     {
@@ -372,7 +372,7 @@ static inline word mch_memory_fetch_decode_1(self, word addr)
     return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
-static word mch_memory_fetch_decode_2(self, word addr)
+PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
     
@@ -399,7 +399,7 @@ static word mch_memory_fetch_decode_2(self, word addr)
     return res;
 }
 
-ATTR_HOT static word mch_memory_fetch_PC(self)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 {
     word addr = mb->PC;
     mb->PC = (addr + 1) & 0xFFFF;
@@ -409,7 +409,7 @@ ATTR_HOT static word mch_memory_fetch_PC(self)
     return res;
 }
 
-ATTR_HOT static word mch_memory_fetch_PC_2(self)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_2(self)
 {
     word addr = mb->PC;
     #if CONFIG_DBG
@@ -428,49 +428,49 @@ ATTR_HOT static word mch_memory_fetch_PC_2(self)
 
 #pragma region Flag mode control
 
-static inline void mbh_fr_set_r8_add(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_add(self, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADD_r8;
 }
 
-static inline void mbh_fr_set_r8_adc(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_adc(self, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADC_r8;
 }
 
-static inline void mbh_fr_set_r8_sub(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_sub(self, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_SUB_r8;
 }
 
-static inline void mbh_fr_set_r8_sbc(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_sbc(self, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_SBC_r8;
 }
 
-static inline void mbh_fr_set_r16_add(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r16_add(self, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADD_r16;
 }
 
-static inline void mbh_fr_set_r16_add_r8(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r16_add_r8(self, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADD_r16_r8;
 }
 
-word mbh_fr_get(self, word Fin)
+PGB_FUNC word mbh_fr_get(self, word Fin)
 {
     if(!mb->FMC_MODE)
         return Fin;
@@ -540,27 +540,27 @@ word mbh_fr_get(self, word Fin)
     return Fin;
 }
 
-static inline word mbh_cc_check_0(word F)
+PGB_FUNC static inline word mbh_cc_check_0(word F)
 {
     return ~F & 0x80; // NZ
 }
 
-static inline word mbh_cc_check_1(word F)
+PGB_FUNC static inline word mbh_cc_check_1(word F)
 {
     return F & 0x80; // Z
 }
 
-static inline word mbh_cc_check_2(word F)
+PGB_FUNC static inline word mbh_cc_check_2(word F)
 {
     return ~F & 0x10; // NC
 }
 
-static inline word mbh_cc_check_3(word F)
+PGB_FUNC static inline word mbh_cc_check_3(word F)
 {
     return F & 0x10; // C
 }
 
-static word mbh_cc_check(word IR, word F)
+PGB_FUNC static word mbh_cc_check(word IR, word F)
 {
     word res;
     
@@ -622,7 +622,7 @@ void mb_disasm_CB(const struct mb_state* __restrict mb, word CBIR)
 
 #pragma endregion
 
-ATTR_HOT word mb_exec(self)
+PGB_FUNC ATTR_HOT word mb_exec(self)
 {
     register var IR = mb->IR.low;
     r16* __restrict p_reg16_ptr;
@@ -1945,7 +1945,7 @@ ATTR_HOT word mb_exec(self)
 
 #pragma region Memory interface cache operations
 
-void micache_invalidate(struct mb_mi_cache* __restrict mic)
+PGB_FUNC void micache_invalidate(struct mb_mi_cache* __restrict mic)
 {
     word counts = MICACHE_R_VALUE(0x10000);
     
@@ -1959,7 +1959,7 @@ void micache_invalidate(struct mb_mi_cache* __restrict mic)
     while(++i < counts);
 }
 
-void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word start, word end)
+PGB_FUNC void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word start, word end)
 {
     word ends = MICACHE_R_VALUE(end - 1);
     

@@ -1,7 +1,7 @@
 #include "lru.h"
 
 
-void lru_init(struct lru_state* lru)
+PGB_FUNC void lru_init(struct lru_state* lru)
 {
     var i;
     
@@ -14,7 +14,7 @@ void lru_init(struct lru_state* lru)
     }
 }
 
-struct lru_slot* lru_get_read(struct lru_state* lru, word address, word bank)
+PGB_FUNC struct lru_slot* lru_get_read(struct lru_state* lru, word address, word bank)
 {
     var i;
     
@@ -36,7 +36,7 @@ struct lru_slot* lru_get_read(struct lru_state* lru, word address, word bank)
     return 0;
 }
 
-struct lru_slot* lru_get_write(struct lru_state* lru, word address, word bank, var* isnew)
+PGB_FUNC struct lru_slot* lru_get_write(struct lru_state* lru, word address, word bank, var* isnew)
 {
     var i;
     

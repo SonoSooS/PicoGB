@@ -37,7 +37,7 @@
 
 #define crossed(tresh,prev,val) (((prev)<(tresh))&&((val)>=(tresh)))
 
-void ppu_reset(self)
+PGB_FUNC void ppu_reset(self)
 {
     USE_STATE;
     
@@ -51,7 +51,7 @@ void ppu_reset(self)
     ps->posX = 0;
 }
 
-void ppu_initialize(self)
+PGB_FUNC void ppu_initialize(self)
 {
     pp->is_cgb = 0;
     
@@ -80,7 +80,7 @@ void ppu_initialize(self)
     ppu_reset(pp);
 }
 
-void ppu_turn_off(self)
+PGB_FUNC void ppu_turn_off(self)
 {
     USE_STATE;
     
@@ -92,7 +92,7 @@ void ppu_turn_off(self)
     ps->subclk = 0;
 }
 
-static inline const r8* __restrict ppu_resolve_line_tile(self, word idx, word line)
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_tile(self, word idx, word line)
 {
     if(!(pp->rLCDC & (1 << 4)))
     {
@@ -112,14 +112,14 @@ static inline const r8* __restrict ppu_resolve_line_tile(self, word idx, word li
         return &pp->VRAM[(idx << 4) | (line << 1)];
 }
 
-static inline const r8* __restrict ppu_resolve_line_sprite(self, word idx, word line)
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite(self, word idx, word line)
 {
     return &pp->VRAM[(idx << 4) | (line << 1)];
 }
 
 #if PPU_IS_DITHER
 #if CONFIG_PPU_INVERT
-static const pixel_t ditherbuf[4][4] =
+static const pixel_t ditherbuf[4][4] PGB_DATA =
 {
     {0, 0, 0, 0},
     {1, 0, 0, 0},
@@ -127,7 +127,7 @@ static const pixel_t ditherbuf[4][4] =
     {1, 1, 1, 1},
 };
 #else
-static const pixel_t ditherbuf[4][4] =
+static const pixel_t ditherbuf[4][4] PGB_DATA =
 {
     {1, 1, 1, 1},
     {1, 0, 0, 1},
@@ -138,15 +138,24 @@ static const pixel_t ditherbuf[4][4] =
 #endif
 
 #if !PPU_IS_MONOCHROME
-static const pixel_t palette[] =
+static const pixel_t palette[] PGB_DATA =
 #if PPU_MODE == 4 || PPU_MODE == 5
 {0xA, 0x2, 0x8, 0x0};
+#elif PPU_MODE == 6
+//{0x1084, 0x21AA, 0x3EB3, 0x5FB0};
+#define RGB565(a1, a2, a3) (((a1 >> 3) << (5 + 6)) | ((a2 >> 2) << 5) | ((a3 >> 3) << 0))
+{
+    __builtin_bswap16(RGB565(0x20, 0x20, 0x20)),
+    __builtin_bswap16(RGB565(0x47, 0x69, 0x51)),
+    __builtin_bswap16(RGB565(0x79, 0xAF, 0x98)),
+    __builtin_bswap16(RGB565(0xBD, 0xEF, 0x86))
+};
 #else
 {0x202020, 0x476951, 0x79AF98, 0xBDEF86};
 #endif
 #endif
 
-static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* __restrict tiledata, word attr)
+PGB_FUNC static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* __restrict tiledata, word attr)
 {
     var tl = tiledata[0];
     var th = tiledata[1];
@@ -186,6 +195,7 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
             break;
         }
         
+    #if CONFIG_IS_CGB
         if(IS_CGB)
         {
             var coli = ((attr & 7) << 2) | bd;
@@ -193,6 +203,7 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
             #if !CONFIG_PPU_CGB_MONO
             var px16 = !is_sprite ? pp->BGP[coli] : pp->OBP[coli];
             
+        #if PPU_MODE != 6
             var comp = (px16 & 0x1F) << 3;
             comp |= comp >> 5;
             px = comp << 16;
@@ -204,6 +215,9 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
             comp = ((px16 >> 10) & 0x1F) << 3;
             comp |= comp >> 5;
             px |= comp << 0;
+        #else
+            px = px16;
+        #endif
             #else
             px = palette
         #if CONFIG_PPU_INVERT
@@ -214,6 +228,7 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
             #endif
         }
         else
+    #endif
         {
             if(!is_sprite)
             {
@@ -281,7 +296,7 @@ static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* _
     #endif
 }
 
-static void ppu_render_scanline(self)
+PGB_FUNC static void ppu_render_scanline(self)
 {
     USE_STATE;
     
@@ -395,14 +410,14 @@ static void ppu_render_scanline(self)
     }
 }
 
-static inline word ppu_stat_set_mode(self, word mode)
+PGB_FUNC static inline word ppu_stat_set_mode(self, word mode)
 {
     var prev = pp->rSTAT & 3;
     pp->rSTAT = (pp->rSTAT & 0xFC) | (mode & 3);
     return prev;
 }
 
-static void ppu_update_LYC(self, word scanY)
+PGB_FUNC static void ppu_update_LYC(self, word scanY)
 {
     if(scanY == pp->rLYC)
     {
@@ -417,7 +432,7 @@ static void ppu_update_LYC(self, word scanY)
     }
 }
 
-static void ppu_update_newline(self, word scanY)
+PGB_FUNC static void ppu_update_newline(self, word scanY)
 {
     ppu_update_LYC(pp, scanY);
     
@@ -449,12 +464,12 @@ static void ppu_update_newline(self, word scanY)
     }
 }
 
-void ppu_turn_on(self)
+PGB_FUNC void ppu_turn_on(self)
 {
     ppu_update_newline(pp, 0);
 }
 
-static inline void ppu_tick_internal_1(self)
+PGB_FUNC static inline void ppu_tick_internal_1(self)
 {
     USE_STATE;
     
@@ -490,7 +505,7 @@ static inline void ppu_tick_internal_1(self)
         ps->latches[j++].low = 0;
 }
 
-static inline void ppu_tick_internal_2(self)
+PGB_FUNC static inline void ppu_tick_internal_2(self)
 {
     USE_STATE;
     
@@ -525,7 +540,7 @@ static inline void ppu_tick_internal_2(self)
 #endif
 }
 
-static inline void ppu_tick_internal_3(self)
+PGB_FUNC static inline void ppu_tick_internal_3(self)
 {
     USE_STATE;
     
@@ -543,7 +558,7 @@ static inline void ppu_tick_internal_3(self)
     ppu_update_newline(pp, scanY);
 }
 
-void ppu_tick_internal(self, word ncycles, word rem)
+PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
 {
     var ren = pp->next_update_n;
     

@@ -10,7 +10,7 @@
 #endif
 
 
-void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
+PGB_FUNC void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
 {
     //if(!(ud->TIMER_CNT & 4))
     //    return;
@@ -67,7 +67,7 @@ void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
     ud->TIMER_SUB = nres;
 }
 
-static const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
+PGB_FUNC static const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
 {
     const r8* res = 0;
     
@@ -92,7 +92,7 @@ static const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
     return 0;
 }
 
-word pgf_cb_IO_(void* userdata, word addr, word data, word type)
+PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
@@ -126,7 +126,9 @@ word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 if(type)
                 {
                     ud->mb->DIV = 0;
+                #if CONFIG_APU_ENABLE
                     ud->apu->CTR_DIV = 0;
+                #endif
                     return 0;
                 }
                 
@@ -177,10 +179,14 @@ word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else if(reg < 0x27)
         {
+        #if CONFIG_APU_ENABLE
             if(type)
                 apu_write(ud->apu, reg, data);
             else
                 return apu_read(ud->apu, reg);
+        #else
+            return 0xFF;
+        #endif
         }
         else if(reg < 0x30)
         {
@@ -188,10 +194,14 @@ word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else if(reg < 0x40)
         {
+        #if CONFIG_APU_ENABLE
             if(type)
                 apu_write_wave(ud->apu, reg, data);
             else
                 return apu_read_wave(ud->apu, reg);
+        #else
+            return 0xFF;
+        #endif
         }
         else if(reg < 0x4C) // PPU
         {
@@ -454,7 +464,7 @@ word pgf_cb_IO_(void* userdata, word addr, word data, word type)
     return 0xFF;
 }
 
-static const word mappers[0x20] =
+static const word mappers[0x20] PGB_DATA =
 {
     0, 1, 1, 1,
     0, 2, 2, 0,
@@ -466,7 +476,7 @@ static const word mappers[0x20] =
     5, 5, 5, 0
 };
 
-word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
+PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
@@ -573,7 +583,7 @@ word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
 }
 
 #if CONFIG_ENABLE_LRU
-const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
+PGB_FUNC const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
 {
     USE_UD;
     
