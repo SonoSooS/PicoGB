@@ -65,6 +65,7 @@ void ppu_initialize(ppu_t* __restrict pp);
 void ppu_turn_off(ppu_t* __restrict pp);
 void ppu_turn_on(ppu_t* __restrict pp);
 
+void ppu_on_write_LYC(ppu_t* __restrict pp);
 void ppu_tick_internal(ppu_t* __restrict pp, word ncycles, word rem);
 
 

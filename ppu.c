@@ -1,5 +1,6 @@
 #include "ppu.h"
 
+#include <assert.h>
 
 #define self ppu_t* __restrict pp
 #define USE_STATE struct ppu_state_t* __restrict ps = &pp->state;
@@ -41,7 +42,7 @@ PGB_FUNC void ppu_reset(self)
 {
     USE_STATE;
     
-    pp->next_update_n = 0;
+    pp->next_update_n = 3;
     pp->next_update_ticks = 0;
     
     ps->scanX = 0;
@@ -49,6 +50,10 @@ PGB_FUNC void ppu_reset(self)
     ps->subclk = 0;
     
     ps->posX = 0;
+    
+    pp->_internal_WY = 0;
+    
+    pp->rSTAT = (pp->rSTAT & 0xFC) | 2;
 }
 
 PGB_FUNC void ppu_initialize(self)
@@ -66,8 +71,6 @@ PGB_FUNC void ppu_initialize(self)
     
     pp->rOBPI = 0;
     pp->rBGPI = 0;
-    
-    pp->_internal_WY = 0;
     
     #if PPU_INTERLACE == 1
     pp->state.interlace = 0b11;
@@ -367,43 +370,50 @@ PGB_FUNC static void ppu_render_scanline(self)
     {
         var pattern = 0x100;
         
-        for(i = 10; i--;)
+        i = 10;
+        while(i)
         {
+            --i;
+            
             var posX, idx;
             {
                 hilow16_t hilo = pp->state.latches[i];
                 posX = hilo.low;
                 idx = hilo.high;
             }
-            if(idx >= 40 || posX >= 168 || !posX)
+            if(!posX || posX >= 168 || idx >= 40)
                 continue;
             
             const r8* __restrict oamslice = &pp->OAM[idx << 2];
             
             var y = oamslice[0];
-            var offy = dstY + 16 - y;
-            if(offy >> 4)
-                continue;
-            
+            var objLine = dstY + 16 - y;
+             
             var tile = oamslice[2];
             var attr = oamslice[3];
             
             if(!(pp->rLCDC & (1 << 2)))
             {
+                if(objLine >= 8)
+                    continue;
+                
                 if(attr & (1 << 6))
-                    offy = 7 - offy;
+                    objLine = 7 - objLine;
             }
             else
             {
+                if(objLine >= 16)
+                    continue;
+                
                 tile &= 0xFE;
                 
                 if(attr & (1 << 6))
-                    offy = 15 - offy;
+                    objLine = 15 - objLine;
             }
             
             dstX = posX;
             
-            const r8* __restrict tiledata = ppu_resolve_line_sprite(pp, tile, offy);
+            const r8* __restrict tiledata = ppu_resolve_line_sprite(pp, tile, objLine);
             
             ppu_render_tile_line(pp, &scanline[dstX / PPU_IS_IPP], tiledata, attr | pattern | SCO_CALC | DITHER_PATTERN);
         }
@@ -443,17 +453,11 @@ PGB_FUNC static void ppu_update_newline(self, word scanY)
         if(pp->rSTAT & (1 << 5))
             pp->IF_SCHED |= 2;
     }
-    else
+    else if(ppu_stat_set_mode(pp, 1) != 1)
     {
-        if(ppu_stat_set_mode(pp, 1) != 1)
-        {
-            if(pp->rSTAT & (1 << 4))
-                pp->IF_SCHED |= 2;
-        }
-    }
-    
-    if(scanY == 144)
-    {
+        if(pp->rSTAT & (1 << 4))
+            pp->IF_SCHED |= 2;
+        
         pp->IF_SCHED |= 1;
         
         pp->_internal_WY = 0;
@@ -466,7 +470,22 @@ PGB_FUNC static void ppu_update_newline(self, word scanY)
 
 PGB_FUNC void ppu_turn_on(self)
 {
-    ppu_update_newline(pp, 0);
+    ppu_reset(pp);
+    ppu_update_LYC(pp, pp->state.scanY);
+}
+
+PGB_FUNC void ppu_on_write_LYC(self)
+{
+    ppu_update_LYC(pp, pp->state.scanY);
+}
+
+PGB_FUNC static inline word ppu_tick_internal_0(self)
+{
+    var scanY = pp->state.scanY;
+    
+    ppu_update_newline(pp, scanY);
+    
+    return scanY < 144;
 }
 
 PGB_FUNC static inline void ppu_tick_internal_1(self)
@@ -481,7 +500,12 @@ PGB_FUNC static inline void ppu_tick_internal_1(self)
     if(pp->rLCDC & 2)
     {
         var tresh = scanY + 16;
-        var tresl = tresh - (8 << ((pp->rLCDC >> 2) & 1));
+        var tresl;
+        if(pp->rLCDC & 4)
+            tresl = tresh - 16;
+        else
+            tresl = tresh - 8;
+            
         
         for(i = 0; i != 40; ++i)
         {
@@ -511,10 +535,10 @@ PGB_FUNC static inline void ppu_tick_internal_2(self)
     
     ppu_stat_set_mode(pp, 0);
     
-    var scanY = ps->scanY;
-    
     if(pp->rSTAT & (1 << 3))
         pp->IF_SCHED |= 2;
+    
+    var scanY = ps->scanY;
     
     #if PPU_INTERLACE != 0
     if(scanY & 1)
@@ -548,14 +572,14 @@ PGB_FUNC static inline void ppu_tick_internal_3(self)
     
     if((++scanY) == 154)
     {
+    #if PPU_INTERLACE != 0
         ps->interlace = ~ps->interlace;
+    #endif
         
         scanY = 0;
     }
     
     ps->scanY = scanY;
-    
-    ppu_update_newline(pp, scanY);
 }
 
 PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
@@ -570,9 +594,7 @@ PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
         {
             case 0: // Start of line / OAM scan
             default:
-                ppu_update_newline(pp, pp->state.scanY);
-                
-                if(pp->state.scanY < 144)
+                if(ppu_tick_internal_0(pp))
                 {
                     rem = UPDATE_1 - UPDATE_0;
                     ren = 1;
@@ -582,6 +604,8 @@ PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
                     rem = UPDATE_3 - UPDATE_0;
                     ren = 3;
                 }
+                
+                ppu_update_LYC(pp, pp->state.scanY);
                 
                 break;
             

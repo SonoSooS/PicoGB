@@ -245,8 +245,15 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     return 0x90;
                 #endif
                 case 5: // LYC
-                    rv = &ud->ppu->rLYC;
-                    break;
+                    if(type)
+                    {
+                        ud->ppu->rLYC = data & 0xFF;
+                        ppu_on_write_LYC(ud->ppu);
+                    }
+                    else
+                    {
+                        return ud->ppu->rLYC;
+                    }
                 case 6: // OAMDMA
                 {
                     //TODO: OAMDMA
