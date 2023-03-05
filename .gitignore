@@ -1,4 +1,5 @@
 *.txt
+!LICENSE.txt
 *.bin
 *.py
 *.out
