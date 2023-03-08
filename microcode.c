@@ -7,7 +7,6 @@
 #define self mb_state* __restrict mb
 
 
-
 #if GBA
 #define IR_F_COL (IR & 7)
 #define IR_F_ROW ((IR >> 3) & 7)
@@ -28,23 +27,24 @@
 
 #pragma region Microcode I/O
 
-#pragma region Fabric interface
+#pragma region Resolve uncached region + fabric interface
 
 #if CONFIG_ENABLE_LRU
 // Resolve an aligned(!) pointer to a ROM bank,
 //  based on an input address and current banking settings.
 // addr < 0x8000
-PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word addr)
+PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word r_addr)
 {
     USE_MI;
     
-    const r8* ret = mi->dispatch_ROM_Bank(mi->userdata, addr, mi->BANK_ROM);
+    const r8* ret = mi->dispatch_ROM_Bank(mi->userdata, r_addr << MICACHE_R_BITS, mi->BANK_ROM);
     
     return ret;
 }
 #endif
 
-PGB_FUNC static const r8* mch_resolve_mic_read_internal(const self, word addr)
+// Uncached resolve aligned readable const memory area, based on address
+PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
 {
     //TODO: unfuck this entire thing
     
@@ -52,7 +52,6 @@ PGB_FUNC static const r8* mch_resolve_mic_read_internal(const self, word addr)
     
     USE_MI;
     
-    var r_addr = MICACHE_R_VALUE(addr);
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
     #if CONFIG_ENABLE_LRU
@@ -63,21 +62,21 @@ PGB_FUNC static const r8* mch_resolve_mic_read_internal(const self, word addr)
             {
                 ret = mi->ROM[0];
                 if(ret)
-                    return &ret[addr & ~MICACHE_R_SEL];
+                    return &ret[r_addr << MICACHE_R_BITS];
             }
             else
             {
                 ret = mi->ROM[mi->BANK_ROM];
                 if(ret)
                 {
-                    addr &= 0x3FFF;
-                    return &ret[addr & ~MICACHE_R_SEL];
+                    r_addr &= MICACHE_R_VALUE(0x3FFF);
+                    return &ret[r_addr << MICACHE_R_BITS];
                 }
             }
         }
         
     #if CONFIG_ENABLE_LRU
-        ret = mch_resolve_mic_bank_internal(mb, addr & ~MICACHE_R_SEL);
+        ret = mch_resolve_mic_bank_internal(mb, r_addr);
     #endif
         return ret;
     }
@@ -85,39 +84,35 @@ PGB_FUNC static const r8* mch_resolve_mic_read_internal(const self, word addr)
     {
         const r8* ptr = &mi->VRAM[mi->BANK_VRAM << 13];
         
-        addr &= 0x1FFF;
-        return &(ptr[addr & ~MICACHE_R_SEL]);
+        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        return &(ptr[r_addr << MICACHE_R_BITS]);
     }
     else if(r_addr < MICACHE_R_VALUE(0xC000))
     {
-        addr &= 0x1FFF;
-        
         const r8* ptr = &mi->SRAM[mi->BANK_SRAM << 13];
         
-        return &(ptr[addr & ~MICACHE_R_SEL]);
+        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        return &(ptr[r_addr << MICACHE_R_BITS]);
+    }
+    else if(r_addr < MICACHE_R_VALUE(0xD000))
+    {
+        r_addr &= MICACHE_R_VALUE(0x0FFF);
+        return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
     }
     else if(r_addr < MICACHE_R_VALUE(0xE000))
     {
-        addr &= 0xFFF;
+        var bank = mi->BANK_WRAM;
+        if(!bank)
+            bank = 1;
         
-        if(r_addr < MICACHE_R_VALUE(0xD000))
-        {
-            return &(mi->WRAM[addr & ~MICACHE_R_SEL]);
-        }
-        else
-        {
-            var bank = mi->BANK_WRAM;
-            if(!bank)
-                bank = 1;
-            
-            return &(mi->WRAM[(bank << 12) + (addr & ~MICACHE_R_SEL)]);
-        }
+        r_addr &= MICACHE_R_VALUE(0x0FFF);
+        return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
     }
     
     return 0;
 }
 
-PGB_FUNC static r8* mch_resolve_mic_write_internal(const self, word addr)
+PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
 {
     //TODO: unfuck this entire thing
     
@@ -125,50 +120,51 @@ PGB_FUNC static r8* mch_resolve_mic_write_internal(const self, word addr)
     
     USE_MI;
     
-    var r_addr = MICACHE_R_VALUE(addr);
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
+        // ROM is *Read-Only* Memory, can't write to it normally
         return 0;
     }
     else if(r_addr < MICACHE_R_VALUE(0xA000))
     {
         r8* ptr = &mi->VRAM[mi->BANK_VRAM << 13];
         
-        addr &= 0x1FFF;
-        return &(ptr[addr & ~MICACHE_R_SEL]);
+        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        return &(ptr[r_addr << MICACHE_R_BITS]);
     }
     else if(r_addr < MICACHE_R_VALUE(0xC000))
     {
-        addr &= 0x1FFF;
-        
         r8* ptr = &mi->SRAM[mi->BANK_SRAM << 13];
         
-        return &(ptr[addr & ~MICACHE_R_SEL]);
+        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        return &(ptr[r_addr << MICACHE_R_BITS]);
+    }
+    else if(r_addr < MICACHE_R_VALUE(0xD000))
+    {
+        r_addr &= MICACHE_R_VALUE(0x0FFF);
+        return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
     }
     else if(r_addr < MICACHE_R_VALUE(0xE000))
     {
-        addr &= 0xFFF;
+        var bank = mi->BANK_WRAM;
+        if(!bank)
+            bank = 1;
         
-        if(r_addr < MICACHE_R_VALUE(0xD000))
-        {
-            return &(mi->WRAM[addr & ~MICACHE_R_SEL]);
-        }
-        else
-        {
-            var bank = mi->BANK_WRAM;
-            if(!bank)
-                bank = 1;
-            
-            return &(mi->WRAM[(bank << 12) + (addr & ~MICACHE_R_SEL)]);
-        }
+        r_addr &= MICACHE_R_VALUE(0x0FFF);
+        return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
     }
     
+    // ECHO RAM and IO need special treatment, nocache
     return 0;
 }
 
 #pragma endregion
 
-#pragma region Resolve direct I/O
+#pragma region Resolve cached memory region (by address)
+/*
+    All functions in this region: cached memory resolve
+    - addr < 0xE000
+*/
 
 PGB_FUNC static inline const r8* mch_resolve_mic_read(self, word addr)
 {
@@ -181,7 +177,7 @@ PGB_FUNC static inline const r8* mch_resolve_mic_read(self, word addr)
     if(ptr)
         return &ptr[addr & MICACHE_R_SEL];
     
-    ptr = mch_resolve_mic_read_internal(mb, addr);
+    ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
     if(ptr)
     {
         mic->mc_read[r_addr] = ptr;
@@ -202,7 +198,7 @@ PGB_FUNC static inline const r8* mch_resolve_mic_execute(self, word addr)
     if(ptr)
         return &ptr[addr & MICACHE_R_SEL];
     
-    ptr = mch_resolve_mic_read_internal(mb, addr);
+    ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
     if(ptr)
     {
         mic->mc_execute[r_addr] = ptr;
@@ -223,7 +219,7 @@ PGB_FUNC static inline r8* mch_resolve_mic_write(self, word addr)
     if(ptr)
         return &ptr[addr & MICACHE_R_SEL];
     
-    ptr = mch_resolve_mic_write_internal(mb, addr);
+    ptr = mch_resolve_mic_r_direct_write(mb, r_addr);
     if(ptr)
     {
         mic->mc_write[r_addr] = ptr;
@@ -235,11 +231,11 @@ PGB_FUNC static inline r8* mch_resolve_mic_write(self, word addr)
 
 #pragma endregion
 
-#pragma region Direct I/O
+#pragma region Dispatch special (IO + ROM)
 
 PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
 {
-    if(addr >= 0xFF80)
+    if(addr >= 0xFF80) // HRAM + IE
     {
         var hm = addr & 0xFF;
         if(hm != 0xFF)
@@ -254,12 +250,13 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
         }
     }
     
+    // Handle IO by fabric
     return mb->mi->dispatch_IO(mb->mi->userdata, addr, 0, 0);
 }
 
 PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
 {
-    if(addr >= 0xFF80)
+    if(addr >= 0xFF80) // HRAM + IE
     {
         var hm = addr & 0xFF;
         
@@ -277,11 +274,13 @@ PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word d
         return;
     }
     
+    // Handle IO by fabric
     mb->mi->dispatch_IO(mb->mi->userdata, addr, data, 1);
 }
 
 PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self, word addr, word data)
 {
+    // Write to ROM has special meaning, handle by fabric
     mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, 1);
 }
 
@@ -289,6 +288,7 @@ PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self, word addr,
 
 #pragma region Dispatch
 
+// Handle read from memory by microcode, including ECHO RAM
 PGB_FUNC ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
 {
     if(addr < 0xE000)
@@ -320,6 +320,7 @@ PGB_FUNC static word mch_memory_dispatch_read(self, word addr)
 #define mch_memory_dispatch_read mch_memory_dispatch_read_
 #endif
 
+// Handle write to address from microcode, including ECHO RAM support
 PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 {
     DBGF("- /WR %04X <- %02X\n", addr, data);
@@ -356,6 +357,7 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
     }
 }
 
+// Fetch one byte as part of an instruction
 PGB_FUNC static inline word mch_memory_fetch_decode_1(self, word addr)
 {
     if(addr < 0xE000)
@@ -375,6 +377,7 @@ PGB_FUNC static inline word mch_memory_fetch_decode_1(self, word addr)
     return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
+// Fetch two bytes as part of an instruction
 PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
@@ -402,6 +405,7 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
     return res;
 }
 
+// Fetch one byte from PC, incrementing it as well
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 {
     word addr = mb->PC;
@@ -412,6 +416,7 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
     return res;
 }
 
+// Fetch two bytes from PC, incrementing it both times as well
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_2(self)
 {
     word addr = mb->PC;
