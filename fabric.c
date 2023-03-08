@@ -436,7 +436,8 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
     }
     else if((addr >> 8) == 0xFE)
     {
-        r8* __restrict rv = (r8* __restrict)(size_t)&ud->ppu->OAM[0];
+        //TODO: wtf is this even
+        r8* __restrict rv = (r8* __restrict)(size_t)&ud->ppu->OAM[addr & 0xFF];
         
         if(type)
         {
