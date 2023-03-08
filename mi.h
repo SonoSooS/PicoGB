@@ -6,6 +6,12 @@
 #include "lru.h"
 #endif
 
+#define MICACHE_R_RESET 0xFFFF
+#define MICACHE_R_BITS 12
+#define MICACHE_R_SEL ((1 << MICACHE_R_BITS) - 1)
+#define MICACHE_R_VALUE(v) ((v) >> MICACHE_R_BITS)
+
+
 typedef word(*pmiDispatch)(void* userdata, word addr, word data, word type);
 typedef const r8* (*pmiDispatchBank)(void* userdata, word addr, word bank);
 
@@ -18,6 +24,14 @@ struct mi_dispatch_ROM_Bank
     pmiDispatchBank dispatch;
 };
 #endif
+
+struct mb_mi_cache
+{
+    const r8* __restrict mc_execute[MICACHE_R_VALUE(0x10000)];
+    const r8* __restrict mc_read[MICACHE_R_VALUE(0x10000)];
+    r8* __restrict mc_write[MICACHE_R_VALUE(0x10000)];
+    void* _mc_dummy;
+};
 
 struct mi_dispatch
 {

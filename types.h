@@ -21,6 +21,9 @@ typedef unsigned int var;
 typedef unsigned int var;
 #endif
 
+typedef word wbool;
+typedef var vbool;
+
 typedef unsigned char r8;
 typedef unsigned short r16;
 

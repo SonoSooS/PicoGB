@@ -15,19 +15,6 @@
 
 #define MB_FMC_MODE_MAX 4
 
-#define MICACHE_R_RESET 0xFFFF
-#define MICACHE_R_BITS 12
-#define MICACHE_R_SEL ((1 << 12) - 1)
-#define MICACHE_R_VALUE(v) ((v) >> MICACHE_R_BITS)
-
-struct mb_mi_cache
-{
-    const r8* __restrict mc_execute[MICACHE_R_VALUE(0x10000)];
-    const r8* __restrict mc_read[MICACHE_R_VALUE(0x10000)];
-    r8* __restrict mc_write[MICACHE_R_VALUE(0x10000)];
-    void* _mc_dummy;
-};
-
 struct mb_state
 {
     union
@@ -69,3 +56,8 @@ void mb_disasm(const mb_state* __restrict);
 void micache_invalidate(struct mb_mi_cache* __restrict mic);
 void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word start, word end);
 
+
+static inline word mbh_irq_get_pending(const mb_state* __restrict mb)
+{
+    return mb->IE & mb->IF & 0x1F;
+}

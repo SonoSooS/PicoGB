@@ -67,29 +67,9 @@ PGB_FUNC void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, wo
     ud->TIMER_SUB = nres;
 }
 
-PGB_FUNC static const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
+PGB_FUNC const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
 {
-    const r8* res = 0;
-    
-    USE_UD;
-    
-    if(addr < 0x4000)
-        bank = 0;
-    
-    if(ud->mb->mi->ROM)
-    {
-        res = ud->mb->mi->ROM[bank];
-        if(res)
-            return &res[addr & 0x3FFF];
-    }
-    
-#if CONFIG_ENABLE_LRU
-    res = ud->mb->mi->dispatch_ROM_Bank(userdata, addr & ~MICACHE_R_SEL, bank);
-    if(res)
-        return &res[((addr & 0x3FFF) & ~MICACHE_R_SEL) + (addr & MICACHE_R_SEL)];
-#endif
-    
-    return 0;
+    return pgf_resolve_ROM_internal(userdata, addr, bank);
 }
 
 PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)

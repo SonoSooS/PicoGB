@@ -9,15 +9,15 @@
 
 
 #if GBA
-#define F_COL (IR & 7)
-#define F_ROW ((IR >> 3) & 7)
+#define IR_F_COL (IR & 7)
+#define IR_F_ROW ((IR >> 3) & 7)
 #else
-#define F_COL IR_column
-#define F_ROW IR_row
+#define IR_F_COL IR_column
+#define IR_F_ROW IR_row
 #endif
 
-#define MB_R_AF ((mb->reg.A << 8) | mb->reg.F)
-#define MB_W_AF(v) if(1){mb->reg.A = ((v) >> 8) & 0xFF; mb->reg.F = (v) & 0xF0;}
+#define MB_AF_R ((mb->reg.A << 8) | mb->reg.F)
+#define MB_AF_W(v) {mb->reg.A = ((v) >> 8) & 0xFF; mb->reg.F = (v) & 0xF0;}
 #define CC_CHECK (mbh_cc_check(IR, mb->reg.F))
 
 #define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
@@ -649,37 +649,40 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
     // Contains result data to be written back eventually
     var data_result;
     
-    if(mb->IME && (mb->IE & mb->IF & 0x1F))
+    if(mb->IME) // Interrupts are enabled
     {
-        var F = (mb->IE & mb->IF & 0x1F);
-        ++ncycles; // IDU decrement PC penalty cycle
-        
-        data_wide = (mb->PC - 1) & 0xFFFF;
-        
-        var i = 0;
-        for(;;)
+        var F = mbh_irq_get_pending(mb);
+        if(F) // Handle IREQ if there is any
         {
-            if(F & (1 << i))
+            ++ncycles; // IDU decrement PC penalty cycle
+            
+            data_wide = (mb->PC - 1) & 0xFFFF;
+            
+            var i = 0;
+            for(;;)
             {
-                mb->PC = 0x40 | (i << 3);
-                break;
+                if(F & (1 << i))
+                {
+                    mb->PC = 0x40 | (i << 3);
+                    break;
+                }
+                
+                ++i;
             }
             
-            ++i;
+            mb->IME = 0;
+            mb->IME_ASK = 0;
+            
+            mb->IF &= ~(1 << i);
+        
+        #if CONFIG_DBG
+            DBGF("IRQ #%u\n", i);
+        #endif
+            
+            goto generic_push;
         }
-        
-        mb->IME = 0;
-        mb->IME_ASK = 0;
-        
-        mb->IF &= ~(1 << i);
-    
-    #if CONFIG_DBG
-        DBGF("IRQ #%u\n", i);
-    #endif
-        
-        goto generic_push;
     }
-    else if(mb->IME_ASK)
+    else if(mb->IME_ASK) // IME was asked to be turned on
     {
         mb->IME = 1;
         mb->IME_ASK = 0;
@@ -880,7 +883,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             wdat = mb->reg.raw16[2];
             goto generic_push;
         case 0xF5:
-            wdat = MB_R_AF;
+            wdat = MB_AF_R;
             goto generic_push;
         
         case 0xCD: goto generic_call;
@@ -933,7 +936,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     if(0)
                     {
                     instr_JNR_cc_e8: // JR cc, e8
-                        IR_row = (F_ROW & 3) | 4;
+                        IR_row = (IR_F_ROW & 3) | 4;
                     }
                     
                     switch(IR_row)
@@ -1098,7 +1101,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     instr_0x45:
                     // Z1H-
                     
-                    i_dst = F_ROW ^ 1;
+                    i_dst = IR_F_ROW ^ 1;
                     
                     data_flags = mb->reg.F & 0x10;
                     
@@ -1148,7 +1151,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 {
                     instr_0x6:
                     data_reg = mch_memory_fetch_PC(mb);
-                    i_dst = F_ROW ^ 1;
+                    i_dst = IR_F_ROW ^ 1;
                     ++ncycles;
                     goto generic_r8_write;
                 }
@@ -1337,7 +1340,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             
             instr_ALU:
             
-            i_src = F_COL ^ 1;
+            i_src = IR_F_COL ^ 1;
             
             if(i_src != 7)
             {
@@ -1352,7 +1355,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             alu_op_begin:
             data_result = mb->reg.A;
             
-            switch(F_ROW)
+            switch(IR_F_ROW)
             {
                 instr_ALU_0:
                 case 0: // ADD Z0HC
@@ -1606,7 +1609,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         }
                         else
                         {
-                            MB_W_AF(data_wide);
+                            MB_AF_W(data_wide);
                             mb->FMC_MODE = 0; // overwritten manually
                         }
                         
@@ -1677,7 +1680,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 
                 case 3: // junk
                 {
-                    switch(F_ROW)
+                    switch(IR_F_ROW)
                     {
                         instr_303:
                         case 0: // JP n16
@@ -1746,7 +1749,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         {
                             mb->reg.F = mbh_fr_get(mb, mb->reg.F);
                             
-                            data_wide = MB_R_AF;
+                            data_wide = MB_AF_R;
                         }
                         
                     generic_push:
@@ -1942,35 +1945,3 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
     }
     return 0; // WTF
 }
-
-#pragma region Memory interface cache operations
-
-PGB_FUNC void micache_invalidate(struct mb_mi_cache* __restrict mic)
-{
-    word counts = MICACHE_R_VALUE(0x10000);
-    
-    word i = 0;
-    do
-    {
-        mic->mc_execute[i] = 0;
-        mic->mc_write[i] = 0;
-        mic->mc_read[i] = 0;
-    }
-    while(++i < counts);
-}
-
-PGB_FUNC void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word start, word end)
-{
-    word ends = MICACHE_R_VALUE(end - 1);
-    
-    word i = MICACHE_R_VALUE(start);
-    do
-    {
-        mic->mc_execute[i] = 0;
-        mic->mc_write[i] = 0;
-        mic->mc_read[i] = 0;
-    }
-    while(++i <= ends);
-}
-
-#pragma endregion

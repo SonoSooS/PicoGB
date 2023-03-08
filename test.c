@@ -592,6 +592,7 @@ struct mi_dispatch_ROM_Bank lru_dispatch;
 
 const r8* cb_ROM_LRU(void* userdata, word addr, word bank)
 {
+    printf("! LRU %02X:%04X\n", bank, addr);
     const r8* __restrict dataptr = rommap[bank];
     if(dataptr)
     {
@@ -1000,7 +1001,7 @@ int main(int argc, char** argv)
         
         word cycles;
         
-        if(!mb.HALTING || (mb.IE & mb.IF & 0x1F))
+        if(!mb.HALTING || mbh_irq_get_pending(&mb))
         {
             if(mb.HALTING)
             {
