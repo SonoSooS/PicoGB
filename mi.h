@@ -6,8 +6,9 @@
 #include "lru.h"
 #endif
 
-#define MICACHE_R_RESET 0xFFFF
+// Size of cache region in (1 << BITS) size. Valid between 12 to 8 inclusive.
 #define MICACHE_R_BITS 12
+#define MICACHE_R_RESET 0xFFFF
 #define MICACHE_R_SEL ((1 << MICACHE_R_BITS) - 1)
 #define MICACHE_R_VALUE(v) ((v) >> MICACHE_R_BITS)
 

@@ -18,7 +18,7 @@
 
 #define MB_AF_R ((mb->reg.A << 8) | mb->reg.F)
 #define MB_AF_W(v) {mb->reg.A = ((v) >> 8) & 0xFF; mb->reg.F = (v) & 0xF0;}
-#define CC_CHECK (mbh_cc_check(IR, mb->reg.F))
+#define MB_CC_CHECK (mbh_cc_check(IR, mb->reg.F))
 
 #define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
 #define USE_MI struct mi_dispatch* __restrict mi = mb->mi;
@@ -31,6 +31,9 @@
 #pragma region Fabric interface
 
 #if CONFIG_ENABLE_LRU
+// Resolve an aligned(!) pointer to a ROM bank,
+//  based on an input address and current banking settings.
+// addr < 0x8000
 PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word addr)
 {
     USE_MI;
@@ -820,7 +823,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
         case 0xD0:
         case 0xC8:
         case 0xD8:
-            goto instr_RET_cc; // could be CC_CHECK optimized, but the extra cycle is too much work to count
+            goto instr_RET_cc; // could be MB_CC_CHECK optimized, but the extra cycle is too much work to count
         
         case 0xE0:
             wdat = 0xFF00 | mch_memory_fetch_PC(mb);
@@ -1539,7 +1542,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         
                         ncycles += 1; // cc_check penalty cycle
                         
-                        if(!CC_CHECK)
+                        if(!MB_CC_CHECK)
                         {
                             goto generic_fetch;
                         }
@@ -1666,7 +1669,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         instr_JP_cc_n16: //TODO: optimize this if possible
                         // small optimization, no imm fetch if no match
                         
-                        if(CC_CHECK)
+                        if(MB_CC_CHECK)
                             goto generic_jp_abs;
                         else
                         {
@@ -1720,7 +1723,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     {
                         instr_CALL_cc_n16: //TODO: optimize
                         
-                        if(CC_CHECK)
+                        if(MB_CC_CHECK)
                             goto generic_call;
                         else
                         {
