@@ -15,6 +15,20 @@
 
 #include "lru.h"
 
+//#define DEBUGFRAME
+
+#ifdef DEBUGFRAME
+#define FRAME_WIDTH 256
+#define FRAME_HEIGHT 154
+#define FRAME_OFFX 0
+#define FRAME_OFFY 10
+#else
+#define FRAME_WIDTH 160
+#define FRAME_HEIGHT 144
+#define FRAME_OFFX 8
+#define FRAME_OFFY 0
+#endif
+
 
 #if CONFIG_DBG
 var _IS_DBG;
@@ -249,15 +263,15 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             RECT cli;
             cli.left = 0;
             cli.top = 0;
-            cli.right = 160;
-            cli.bottom = 144;
+            cli.right = FRAME_WIDTH;
+            cli.bottom = FRAME_HEIGHT;
             if(!GetClientRect(wnd, &cli))
                 break;
             
             LONG dw1, dw2;
             
-            dw1 = (cli.right - cli.left) / 160;
-            dw2 = (cli.bottom - cli.top) / 144;
+            dw1 = (cli.right - cli.left) / FRAME_WIDTH;
+            dw2 = (cli.bottom - cli.top) / FRAME_HEIGHT;
             
             if(!dw1 && !dw2)
                 break;
@@ -274,10 +288,10 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
                 dw1 = dw2;
             
             if(dw1)
-                adj.right = (cli.left + (dw1 * 160)) - cli.right;
+                adj.right = (cli.left + (dw1 * FRAME_WIDTH)) - cli.right;
             
             if(dw2)
-                adj.bottom = (cli.top + (dw2 * 144)) - cli.bottom;
+                adj.bottom = (cli.top + (dw2 * FRAME_HEIGHT)) - cli.bottom;
             
             
             if(!GetWindowRect(wnd, &cli))
@@ -349,7 +363,7 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             
             bmi->biPlanes = 1;
             bmi->biWidth = 256;
-            bmi->biHeight = -144;
+            bmi->biHeight = -(144 + FRAME_OFFY);
             
             #if PPU_IS_MONOCHROME
             bmi->biBitCount = 1;
@@ -368,14 +382,14 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             RECT cli;
             cli.left = 0;
             cli.top = 0;
-            cli.right = 160;
-            cli.bottom = 144;
+            cli.right = FRAME_WIDTH;
+            cli.bottom = FRAME_HEIGHT;
             GetClientRect(wnd, &cli);
             
             DWORD dw1, dw2;
             
-            dw1 = (cli.right - cli.left) / 160;
-            dw2 = (cli.bottom - cli.top) / 144;
+            dw1 = (cli.right - cli.left) / FRAME_WIDTH;
+            dw2 = (cli.bottom - cli.top) / FRAME_HEIGHT;
             
             if(dw1 < dw2)
                 dw2 = dw1;
@@ -383,16 +397,16 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
                 dw1 = dw2;
             
             if(dw1)
-                cli.right = cli.left + (dw1 * 160);
+                cli.right = cli.left + (dw1 * FRAME_WIDTH);
             
             if(dw2)
-                cli.bottom = cli.top + (dw2 * 144);
+                cli.bottom = cli.top + (dw2 * FRAME_HEIGHT);
             
             StretchDIBits
             (
                 dc,
                 0, 0, cli.right - cli.left, cli.bottom - cli.top,
-                8, 0, 160, 144,
+                FRAME_OFFX, 0, FRAME_WIDTH, FRAME_HEIGHT,
                 ud->ppu->state.framebuffer[0],
                 (BITMAPINFO*)bmi,
                 DIB_RGB_COLORS,
@@ -402,6 +416,48 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             /*
             WCHAR fmtbuf[128];
             TextOutW(dc, 0, 0, fmtbuf, swprintf(fmtbuf, sizeof(fmtbuf) / sizeof(fmtbuf[0]), L"STAT=%02X LYC=%02X LY=%02X LCDC=%02X", ud->ppu->rSTAT, ud->ppu->rLYC, ud->ppu->state.scanY, ud->ppu->rLCDC));
+            */
+            
+            /*
+            HFONT hFont = (HFONT)GetStockObject(SYSTEM_FIXED_FONT);
+            HFONT hOldFont = (HFONT)SelectObject(dc, hFont);
+            
+            char sbuf[128];
+            int nch;
+            
+            nch = sprintf(sbuf, "ptr: %16llX / data: %02X\n", ud->ppu->OAM, ud->_debug);
+            TextOutA(dc, 0, 0, sbuf, nch);
+            
+            var i;
+            const r8* __restrict oam = &ud->ppu->OAM[0];
+            for(i = 0; i != 10; i++)
+            {
+                nch = sprintf(sbuf, "%02X: %02X %02X %02X %02X  %02X %02X %02X %02X  %02X %02X %02X %02X  %02X %02X %02X %02X\n",
+                    i << 4,
+                    oam[0],
+                    oam[1],
+                    oam[2],
+                    oam[3],
+                    oam[4],
+                    oam[5],
+                    oam[6],
+                    oam[7],
+                    oam[8],
+                    oam[9],
+                    oam[10],
+                    oam[11],
+                    oam[12],
+                    oam[13],
+                    oam[14],
+                    oam[15]
+                    );
+                
+                TextOutA(dc, 0, (i + 1) << 4, sbuf, nch);
+                
+                oam += 16;
+            }
+            
+            SelectObject(dc, hOldFont);
             */
             
             EndPaint(wnd, &pstr);
@@ -444,8 +500,8 @@ static HWND wnd_create(const struct pgf_userdata_t* __restrict ud)
     rekt.bottom = GetSystemMetrics(SM_CYSCREEN);
     
     word want_scale = 5;
-    var want_width = 160 * want_scale;
-    var want_height = 144 * want_scale;
+    var want_width = FRAME_WIDTH * want_scale;
+    var want_height = FRAME_HEIGHT * want_scale;
     
     if(rekt.right >= want_width || rekt.bottom >= want_height)
     {

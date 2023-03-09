@@ -5,3 +5,4 @@
 *.out
 *.exe
 /profi.c
+/profi.h

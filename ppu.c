@@ -5,6 +5,9 @@
 #define self ppu_t* __restrict pp
 #define USE_STATE struct ppu_state_t* __restrict ps = &pp->state;
 
+//#define PPU_DEBUG
+
+
 #if defined(PICOGB_PD) || defined(PICOGB_RP2)
 #define IS_CGB 0
 #else
@@ -28,6 +31,12 @@
 #else
 #define SCO_CALC 0
 #define SCO 0
+#endif
+
+#ifdef PPU_DEBUG
+#define RENDER_WIDTH 240
+#else
+#define RENDER_WIDTH 168
 #endif
 
 
@@ -321,7 +330,7 @@ PGB_FUNC static void ppu_render_scanline(self)
     {
         var pattern = DITHER_PATTERN | SCO_CALC;
         
-        for(i = 0; i != 21; ++i)
+        for(i = 0; i != (RENDER_WIDTH / 8); ++i)
         {
             var idx = r_line_idx[srcX];
             var attr = IS_CGB ? r_line_idx[srcX + 0x2000] : 0;
@@ -340,7 +349,7 @@ PGB_FUNC static void ppu_render_scanline(self)
         }
     }
     
-    if((pp->rLCDC & 0x20) && (pp->rWY <= dstY) && (pp->rWX < 168) && pp->rWX)
+    if((pp->rLCDC & 0x20) && (pp->rWY <= dstY) && (pp->rWX < RENDER_WIDTH) && pp->rWX)
     //if(0)
     {
         srcY = pp->_internal_WY;
@@ -353,7 +362,7 @@ PGB_FUNC static void ppu_render_scanline(self)
         r_line_idx = &pp->VRAM[0x1800 | ((srcY >> 3) << 5) | ((pp->rLCDC & (1 << 6)) << 4)];
         
         srcY &= 7;
-        while(dstX < 168)
+        while(dstX < RENDER_WIDTH)
         {
             var idx = r_line_idx[srcX];
             
@@ -370,7 +379,7 @@ PGB_FUNC static void ppu_render_scanline(self)
     {
         var pattern = 0x100;
         
-        i = 10;
+        i = PPU_N_OBJS;
         while(i)
         {
             --i;
@@ -381,7 +390,7 @@ PGB_FUNC static void ppu_render_scanline(self)
                 posX = hilo.low;
                 idx = hilo.high;
             }
-            if(!posX || posX >= 168 || idx >= 40)
+            if(!posX || posX >= RENDER_WIDTH || idx >= 40)
                 continue;
             
             const r8* __restrict oamslice = &pp->OAM[idx << 2];
@@ -411,6 +420,7 @@ PGB_FUNC static void ppu_render_scanline(self)
                     objLine = 15 - objLine;
             }
             
+            objLine &= 15;
             dstX = posX;
             
             const r8* __restrict tiledata = ppu_resolve_line_sprite(pp, tile, objLine);
@@ -519,13 +529,13 @@ PGB_FUNC static inline void ppu_tick_internal_1(self)
                 ps->latches[j].low = x < 168 ? x : 0;
                 ps->latches[j].high = i;
                 
-                if(++j == 10)
+                if(++j == PPU_N_OBJS)
                     break;
             }
         }
     }
     
-    while(j != 10)
+    while(j != PPU_N_OBJS)
         ps->latches[j++].low = 0;
 }
 

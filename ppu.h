@@ -2,6 +2,7 @@
 
 #include "types.h"
 
+#define PPU_N_OBJS 10
 
 struct ppu_state_t
 {
@@ -20,7 +21,7 @@ struct ppu_state_t
     var latchY;
     var latchX;
     
-    hilow16_t latches[10];
+    hilow16_t latches[PPU_N_OBJS];
 };
 
 struct ppu_t

@@ -12,7 +12,7 @@ struct pgf_userdata_t
     struct mb_state* __restrict mb;
     struct ppu_t* __restrict ppu;
     struct apu_t* __restrict apu;
-    void* _resvd;
+    word _debug;
     
     var JOYP_RAW; // A is $01, Right is $10
     var JOYP;

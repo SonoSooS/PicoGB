@@ -72,6 +72,8 @@ PGB_FUNC const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
     return pgf_resolve_ROM_internal(userdata, addr, bank);
 }
 
+//#include "profi.h"
+
 PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
@@ -229,6 +231,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     {
                         ud->ppu->rLYC = data & 0xFF;
                         ppu_on_write_LYC(ud->ppu);
+                        return data;
                     }
                     else
                     {
@@ -236,10 +239,53 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     }
                 case 6: // OAMDMA
                 {
+                    if(!type)
+                        return 0xFF;
+                    
+                    /*
+                    if(data < 0xC0 || data > 0xDF)
+                    {
+                        printf("Triggered bad OAMDMA: %02X\n", data);
+                        printf(" A: %02X\n", ud->mb->reg.A);
+                        if(!(ud->mb->reg.F & 0xF))
+                            printf(" F: %01Xx\n", ud->mb->reg.F >> 4);
+                        else
+                            printf(" F: %02X (!!!)\n", ud->mb->reg.F);
+                        
+                        printf("BC: %04X\n", ud->mb->reg.BC);
+                        printf("DE: %04X\n", ud->mb->reg.DE);
+                        printf("HL: %04X\n", ud->mb->reg.HL);
+                        printf("PC: %04X\n", ud->mb->PC);
+                        printf("SP: %04X\n", ud->mb->SP);
+                        printf("IR: %02X %u\n", ud->mb->IR.low, ud->mb->IR.high);
+                        printf("IRQ %02X & %02X %u:%u\n", ud->mb->IE, ud->mb->IF, ud->mb->IME, ud->mb->IME_ASK);
+                        
+                        puts("");
+                        
+                        if(profi_depth)
+                        {
+                            DWORD di;
+                            printf("%s", "Call stack:\n");
+                            
+                            for(di = 0; di != profi_depth; di++)
+                            {
+                                printf("- %08lX -> %08lX\n", profi_callchain[di].HighPart, profi_callchain[di].LowPart);
+                            }
+                        }
+                        else
+                        {
+                            puts("Bad call stack: no depth");
+                        }
+                        
+                        puts("===");
+                    }
+                    */
+                    
                     //TODO: OAMDMA
+                    //ud->_debug = data;
                     var wb = data << 8;
                     var w;
-                    r8* __restrict OAM = (r8* __restrict)(size_t)ud->ppu->OAM;
+                    r8* __restrict OAM = (r8* __restrict)(size_t)&ud->ppu->OAM[0];
                     const r8* __restrict SRC;
                     switch((data >> 4) & 0xF)
                     {
@@ -318,6 +364,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         {
             if(reg == 0x4F)
             {
+            #if CONFIG_FORCE_ENABLE_CGB
                 if(type)
                 {
                     ud->mb->mi->BANK_VRAM = data & 1;
@@ -327,6 +374,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 }
                 
                 return ud->mb->mi->BANK_VRAM | 0xFE;
+            #endif
             }
             else if(reg == 0x50)
             {
@@ -337,7 +385,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     #endif
                     
                     //micache_invalidate(&ud->mb->micache);
-                    micache_invalidate_range(&ud->mb->micache, 0x0000, 0x0FFF);
+                    micache_invalidate_range(&ud->mb->micache, 0x0000, 0x7FFF);
                     return data;
                 }
                 
@@ -420,6 +468,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 0x70)
             {
+            #if CONFIG_FORCE_ENABLE_CGB
                 if(type)
                 {
                     ud->mb->mi->BANK_WRAM = data & 7;
@@ -429,6 +478,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 }
                 
                 return ud->mb->mi->BANK_WRAM | 0xF8;
+            #endif
             }
         }
         
