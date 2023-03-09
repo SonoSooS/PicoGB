@@ -46,11 +46,9 @@ PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word 
 // Uncached resolve aligned readable const memory area, based on address
 PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
 {
-    //TODO: unfuck this entire thing
+    USE_MI;
     
     const r8* ret = 0;
-    
-    USE_MI;
     
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
@@ -114,10 +112,6 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
 
 PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
 {
-    //TODO: unfuck this entire thing
-    
-    r8* ret = 0;
-    
     USE_MI;
     
     if(r_addr < MICACHE_R_VALUE(0x8000))
@@ -325,8 +319,6 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 {
     DBGF("- /WR %04X <- %02X\n", addr, data);
     
-    USE_MIC;
-    
     var r_addr = MICACHE_R_VALUE(addr);
     
     if(r_addr >= MICACHE_R_VALUE(0x8000))
@@ -351,8 +343,6 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
     else
     {
         mch_memory_dispatch_write_ROM(mb, addr, data);
-        //micache_invalidate_range(mic, 0x4000, 0x7FFF);
-        
         return;
     }
 }
@@ -386,8 +376,6 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
     word r2 = MICACHE_R_VALUE(addr2);
     if((r1 == r2) && (addr <= 0xDFFE))
     {
-        USE_MIC;
-        
         const r8* ptr = mch_resolve_mic_execute(mb, addr);
         
         var nres = *(ptr++);
@@ -570,8 +558,6 @@ PGB_FUNC static inline word mbh_cc_check_3(word F)
 
 PGB_FUNC static word mbh_cc_check(word IR, word F)
 {
-    word res;
-    
     switch((IR >> 3) & 3)
     {
         case 0: return mbh_cc_check_0(F); // NZ
@@ -704,7 +690,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
     }
 #endif
     
-    // BROKEN, DO NOT USE
+    // BROKEN, DO NOT USE YET
     #if 0
     switch(IR)
     {
@@ -719,29 +705,29 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
         case 0x38: if(mbh_cc_check_3(mb->reg.F)) goto generic_jr; else goto instr_JNR_cc_e8_fail;
         
         case 0x01:
-            ld_dst_addr = &mb->reg.raw16[0];
+            p_reg16_ptr = &mb->reg.raw16[0];
             goto instr_0x1_0;
         case 0x11:
-            ld_dst_addr = &mb->reg.raw16[1];
+            p_reg16_ptr = &mb->reg.raw16[1];
             goto instr_0x1_0;
         case 0x21:
-            ld_dst_addr = &mb->reg.raw16[2];
+            p_reg16_ptr = &mb->reg.raw16[2];
             goto instr_0x1_0;
         case 0x31:
-            ld_dst_addr = &mb->SP;
+            p_reg16_ptr = &mb->SP;
             goto instr_0x1_0;
         
         case 0x09:
-            ld_dst_addr = &mb->reg.raw16[0];
+            p_reg16_ptr = &mb->reg.raw16[0];
             goto instr_0x1_1;
         case 0x19:
-            ld_dst_addr = &mb->reg.raw16[1];
+            p_reg16_ptr = &mb->reg.raw16[1];
             goto instr_0x1_1;
         case 0x29:
-            ld_dst_addr = &mb->reg.raw16[2];
+            p_reg16_ptr = &mb->reg.raw16[2];
             goto instr_0x1_1;
         case 0x39:
-            ld_dst_addr = &mb->SP;
+            p_reg16_ptr = &mb->SP;
             goto instr_0x1_1;
         
         case 0x02:
@@ -831,10 +817,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             goto instr_RET_cc; // could be MB_CC_CHECK optimized, but the extra cycle is too much work to count
         
         case 0xE0:
-            wdat = 0xFF00 | mch_memory_fetch_PC(mb);
+            data_wide = 0xFF00 | mch_memory_fetch_PC(mb);
             goto instr_340;
         case 0xF0:
-            wdat = 0xFF00 | mch_memory_fetch_PC(mb);
+            data_wide = 0xFF00 | mch_memory_fetch_PC(mb);
             goto instr_360;
         
         case 0xE8:
@@ -853,17 +839,17 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             goto instr_POP_r16;
         
         case 0xEA:
-            wdat = mch_memory_fetch_PC_2(mb);
+            data_wide = mch_memory_fetch_PC_2(mb);
             goto instr_352;
         case 0xFA:
-            wdat = mch_memory_fetch_PC_2(mb);
+            data_wide = mch_memory_fetch_PC_2(mb);
             goto instr_372;
         
         case 0xE2:
-            wdat = 0xFF00 | mb->reg.C;
+            data_wide = 0xFF00 | mb->reg.C;
             goto instr_342;
         case 0xF2:
-            wdat = 0xFF00 | mb->reg.C;
+            data_wide = 0xFF00 | mb->reg.C;
             goto instr_362;
         
         case 0xC2: if(mbh_cc_check_0(mb->reg.F)) goto generic_jp_abs; else goto instr_JP_cc_n16_fail;
@@ -882,16 +868,17 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
         case 0xDC: if(mbh_cc_check_3(mb->reg.F)) goto generic_call; else goto instr_CALL_cc_n16;
         
         case 0xC5:
-            wdat = mb->reg.raw16[0];
+            data_wide = mb->reg.raw16[0];
             goto generic_push;
         case 0xD5:
-            wdat = mb->reg.raw16[1];
+            data_wide = mb->reg.raw16[1];
             goto generic_push;
         case 0xE5:
-            wdat = mb->reg.raw16[2];
+            data_wide = mb->reg.raw16[2];
             goto generic_push;
         case 0xF5:
-            wdat = MB_AF_R;
+            mb->reg.F = mbh_fr_get(mb, mb->reg.F);
+            data_wide = MB_AF_R;
             goto generic_push;
         
         case 0xCD: goto generic_call;
@@ -1825,7 +1812,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
         //mb->HALTING = !(mb->IE & mb->IF & 0x1F);
         mb->HALTING = 1;
         
-        var PC = mb->PC;
+        //var PC = mb->PC;
         mb->IR.raw = mch_memory_fetch_PC(mb);
         /*
         mb->PC = PC;
