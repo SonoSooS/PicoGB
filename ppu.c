@@ -8,7 +8,7 @@
 //#define PPU_DEBUG
 
 
-#if defined(PICOGB_PD) || defined(PICOGB_RP2)
+#if !CONFIG_FORCE_ENABLE_CGB
 #define IS_CGB 0
 #else
 #define IS_CGB (pp->is_cgb)
@@ -108,12 +108,14 @@ PGB_FUNC static inline const r8* __restrict ppu_resolve_line_tile(self, word idx
 {
     if(!(pp->rLCDC & (1 << 4)))
     {
-        //var midx = (((~idx & 0x80) << 1) | idx) << 1;
+        var midx = (((~idx & 0x80) << 1) | idx);
+        /*
         var midx;
         if(idx < 0x80)
             midx = (idx + 0x100);
         else
             midx = idx;
+        */
         return &pp->VRAM[(midx << 4) | (line << 1)];
         
         //0x07F 0x080  0 01111111  0 10000000
