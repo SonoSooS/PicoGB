@@ -548,38 +548,40 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
     return Fin;
 }
 
-PGB_FUNC static inline word mbh_cc_check_0(word F)
+PGB_FUNC static inline wbool mbh_cc_check_0(word F)
 {
     return ~F & 0x80; // NZ
 }
 
-PGB_FUNC static inline word mbh_cc_check_1(word F)
+PGB_FUNC static inline wbool mbh_cc_check_1(word F)
 {
     return F & 0x80; // Z
 }
 
-PGB_FUNC static inline word mbh_cc_check_2(word F)
+PGB_FUNC static inline wbool mbh_cc_check_2(word F)
 {
     return ~F & 0x10; // NC
 }
 
-PGB_FUNC static inline word mbh_cc_check_3(word F)
+PGB_FUNC static inline wbool mbh_cc_check_3(word F)
 {
     return F & 0x10; // C
 }
 
-PGB_FUNC static word mbh_cc_check(word IR, word F)
+PGB_FUNC static wbool mbh_cc_check(word IR, word F)
 {
-    switch((IR >> 3) & 3)
-    {
-        case 0: return mbh_cc_check_0(F); // NZ
-        case 1: return mbh_cc_check_1(F); // Z
-        case 2: return mbh_cc_check_2(F); // NC
-        case 3: return mbh_cc_check_3(F); // C
-        
-        default:
-            __builtin_unreachable();
-    }
+    register word IR_r = (IR >> 3) & 3;
+    
+    if(IR_r == 0)
+        return mbh_cc_check_0(F); // NZ
+    else if(IR_r == 1)
+        return mbh_cc_check_1(F); // Z
+    else if(IR_r == 2)
+        return mbh_cc_check_2(F); // NC
+    else if(IR_r == 3)
+        return mbh_cc_check_3(F); // C
+    
+    __builtin_unreachable();
 }
 
 #pragma endregion
