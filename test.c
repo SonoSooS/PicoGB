@@ -1070,7 +1070,17 @@ int main(int argc, char** argv)
         }
         else
         {
-            cycles = 1;
+            //cycles = 1;
+            
+            if(pp.rLCDC & 0x80)
+                cycles = (pp.next_update_ticks) >> 2;
+            else if(userdata.TIMER_CNT & 4)
+                cycles = (0x100 - userdata.TIMER_ACCUM);
+            else
+                cycles = 80 >> 2;
+            
+            if(!cycles)
+                cycles = 1;
         }
         //printf("  Took %u cycles.\n", cycles);
         
