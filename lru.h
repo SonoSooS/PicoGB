@@ -28,7 +28,7 @@ void lru_init(struct lru_state* lru);
 struct lru_slot* lru_get_read(struct lru_state* lru, word address, word bank);
 struct lru_slot* lru_get_write(struct lru_state* lru, word address, word bank, var* isnew);
 
-static inline void lru_update_slot(struct lru_slot* slot, word address, word bank)
+PGB_FUNC static inline void lru_update_slot(struct lru_slot* slot, word address, word bank)
 {
     if(address < 0x4000)
         bank = 0;

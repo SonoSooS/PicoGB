@@ -70,7 +70,7 @@ void ppu_on_write_LYC(ppu_t* __restrict pp);
 void ppu_tick_internal(ppu_t* __restrict pp, word ncycles, word rem);
 
 
-static inline word ppu_tick(ppu_t* __restrict pp, word ncycles)
+PGB_FUNC static inline word ppu_tick(ppu_t* __restrict pp, word ncycles)
 {
     var rem = pp->next_update_ticks;
     

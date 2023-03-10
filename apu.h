@@ -43,7 +43,7 @@ word apu_read_wave(apu_t* __restrict pp, word addr);
 
 void apu_tick_internal(apu_t* __restrict pp);
 
-static inline void apu_tick(apu_t* __restrict pp, word ncycles)
+PGB_FUNC static inline void apu_tick(apu_t* __restrict pp, word ncycles)
 {
     if(pp->MASTER_CFG & (1 << 23))
     {
