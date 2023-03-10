@@ -16,7 +16,7 @@
 // 1 - 1bpp jankdither globally fixed
 // 2 - 1bpp nodither
 // 3 - 1bpp jankdither locally fixed
-#define PPU_MODE 2
+#define PPU_MODE 3
 
 // 0 - no interlacing
 // 1 - full frame interlacing (half FPS)
