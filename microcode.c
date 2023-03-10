@@ -166,10 +166,13 @@ PGB_FUNC static inline const r8* mch_resolve_mic_read(self, word addr)
     
     var r_addr = MICACHE_R_VALUE(addr);
     
-    const r8* ptr = mic->mc_read[r_addr];
+    const r8* ptr;
     
+#if !CONFIG_MIC_CACHE_BYPASS
+    ptr = mic->mc_read[r_addr];
     if(ptr)
         return &ptr[addr & MICACHE_R_SEL];
+#endif
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
     if(ptr)
@@ -187,10 +190,13 @@ PGB_FUNC static inline const r8* mch_resolve_mic_execute(self, word addr)
     
     var r_addr = MICACHE_R_VALUE(addr);
     
-    const r8* ptr = mic->mc_execute[r_addr];
+    const r8* ptr;
     
+#if !CONFIG_MIC_CACHE_BYPASS
+    ptr = mic->mc_execute[r_addr];
     if(ptr)
         return &ptr[addr & MICACHE_R_SEL];
+#endif
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
     if(ptr)
@@ -208,10 +214,13 @@ PGB_FUNC static inline r8* mch_resolve_mic_write(self, word addr)
     
     var r_addr = MICACHE_R_VALUE(addr);
     
-    r8* ptr = mic->mc_write[r_addr];
+    r8* ptr;
     
+#if !CONFIG_MIC_CACHE_BYPASS
+    ptr = mic->mc_write[r_addr];
     if(ptr)
         return &ptr[addr & MICACHE_R_SEL];
+#endif
     
     ptr = mch_resolve_mic_r_direct_write(mb, r_addr);
     if(ptr)
@@ -232,6 +241,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     if(addr >= 0xFF80) // HRAM + IE
     {
         var hm = addr & 0xFF;
+        
         if(hm != 0xFF)
         {
             USE_MI;
@@ -372,6 +382,7 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
     
+#if !CONFIG_MIC_CACHE_BYPASS
     word r1 = MICACHE_R_VALUE(addr);
     word r2 = MICACHE_R_VALUE(addr2);
     if((r1 == r2) && (addr <= 0xDFFE))
@@ -383,6 +394,7 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
         
         return nres;
     }
+#endif
     
     word res1 = mch_memory_fetch_decode_1(mb, addr);
     word res2 = mch_memory_fetch_decode_1(mb, addr2);
