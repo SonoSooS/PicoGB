@@ -474,6 +474,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     ud->mb->mi->BANK_WRAM = data & 7;
                     //micache_invalidate(&ud->mb->micache);
                     micache_invalidate_range(&ud->mb->micache, 0xD000, 0xDFFF);
+                    micache_invalidate_range(&ud->mb->micache, 0xE000, 0xFDFF);
                     return data;
                 }
                 
