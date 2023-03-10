@@ -158,7 +158,7 @@ PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
     - addr < 0xE000
 */
 
-PGB_FUNC static inline const r8* mch_resolve_mic_read(self, word addr)
+PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_read(self, word addr)
 {
     USE_MIC;
     
@@ -182,31 +182,7 @@ PGB_FUNC static inline const r8* mch_resolve_mic_read(self, word addr)
     return 0;
 }
 
-PGB_FUNC static inline const r8* mch_resolve_mic_execute(self, word addr)
-{
-    USE_MIC;
-    
-    var r_addr = MICACHE_R_VALUE(addr);
-    
-    const r8* ptr;
-    
-#if !CONFIG_MIC_CACHE_BYPASS
-    ptr = mic->mc_execute[r_addr];
-    if(ptr)
-        return &ptr[addr & MICACHE_R_SEL];
-#endif
-    
-    ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
-    if(ptr)
-    {
-        mic->mc_execute[r_addr] = ptr;
-        return &ptr[addr & MICACHE_R_SEL];
-    }
-    
-    return 0;
-}
-
-PGB_FUNC static inline r8* mch_resolve_mic_write(self, word addr)
+PGB_FUNC ATTR_HOT static inline r8* mch_resolve_mic_write(self, word addr)
 {
     USE_MIC;
     
@@ -224,6 +200,30 @@ PGB_FUNC static inline r8* mch_resolve_mic_write(self, word addr)
     if(ptr)
     {
         mic->mc_write[r_addr] = ptr;
+        return &ptr[addr & MICACHE_R_SEL];
+    }
+    
+    return 0;
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE static inline const r8* mch_resolve_mic_execute(self, word addr)
+{
+    USE_MIC;
+    
+    var r_addr = MICACHE_R_VALUE(addr);
+    
+    const r8* ptr;
+    
+#if !CONFIG_MIC_CACHE_BYPASS
+    ptr = mic->mc_execute[r_addr];
+    if(ptr)
+        return &ptr[addr & MICACHE_R_SEL];
+#endif
+    
+    ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
+    if(ptr)
+    {
+        mic->mc_execute[r_addr] = ptr;
         return &ptr[addr & MICACHE_R_SEL];
     }
     
@@ -356,7 +356,7 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 }
 
 // Fetch one byte as part of an instruction
-PGB_FUNC static inline word mch_memory_fetch_decode_1(self, word addr)
+PGB_FUNC ATTR_HOT static inline word mch_memory_fetch_decode_1(self, word addr)
 {
     if(addr < 0xE000)
     {
@@ -375,32 +375,52 @@ PGB_FUNC static inline word mch_memory_fetch_decode_1(self, word addr)
     return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
-// Fetch two bytes as part of an instruction
-PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_decode_1_noinline(self, word addr)
+{
+    return mch_memory_fetch_decode_1(mb, addr);
+}
+
+PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2_slow(self, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
     
-#if !CONFIG_MIC_CACHE_BYPASS
-    word r1 = MICACHE_R_VALUE(addr);
-    word r2 = MICACHE_R_VALUE(addr2);
-    if((r1 == r2) && (addr <= 0xDFFE))
-    {
-        const r8* ptr = mch_resolve_mic_execute(mb, addr);
-        
-        var nres = *(ptr++);
-        nres |= *(ptr++) << 8;
-        
-        return nres;
-    }
-#endif
-    
-    word res1 = mch_memory_fetch_decode_1(mb, addr);
-    word res2 = mch_memory_fetch_decode_1(mb, addr2);
+    word res1 = mch_memory_fetch_decode_1_noinline(mb, addr);
+    word res2 = mch_memory_fetch_decode_1_noinline(mb, addr2);
     
     var res = res1;
     res |= (res2) << 8;
     
     return res;
+}
+
+// Fetch two bytes as part of an instruction
+PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
+{
+#if !CONFIG_MIC_CACHE_BYPASS
+    word addr2 = (addr + 1) & 0xFFFF;
+    
+    if(addr <= (0xE000 - 2))
+    {
+        word r1 = MICACHE_R_VALUE(addr);
+        word r2 = MICACHE_R_VALUE(addr2);
+        if(r1 == r2)
+        {
+            // This has to be volatile, otherwise
+            //  an LDRH is emitted, which is no cool, as
+            //  the pointer will very likely be not aligned.
+            // This sadly wastes precious CPU cycles,
+            //  but it's necessary to avoid unaligned data abort.
+            const volatile r8* ptr = mch_resolve_mic_execute(mb, addr);
+            
+            var nres = *(ptr++);
+            nres |= *(ptr++) << 8;
+            
+            return nres;
+        }
+    }
+#endif
+    
+    return mch_memory_fetch_decode_2_slow(mb, addr);
 }
 
 // Fetch one byte from PC, incrementing it as well
@@ -418,13 +438,10 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_2(self)
 {
     word addr = mb->PC;
-    #if CONFIG_DBG
-    word addr_orig = addr;
-    #endif
-    word resp = mch_memory_fetch_decode_2(mb, addr);
     mb->PC = (addr + 2) & 0xFFFF;
     
-    DBGF("- /M2 %04X <> %04X\n", addr_orig, resp);
+    word resp = mch_memory_fetch_decode_2(mb, addr);
+    DBGF("- /M2 %04X <> %04X\n", addr, resp);
     return resp;
 }
 

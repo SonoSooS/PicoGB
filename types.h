@@ -4,6 +4,9 @@
 
 
 #define ATTR_HOT __attribute__((hot))
+#define ATTR_FORCE_INLINE __attribute__((always_inline))
+#define ATTR_FORCE_NOINLINE __attribute__((noinline))
+
 #if PPU_IS_MONOCHROME
 typedef unsigned char pixel_t;
 #elif PPU_MODE == 4
