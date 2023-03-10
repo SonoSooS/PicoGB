@@ -22,8 +22,6 @@
 #define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
 #define USE_MI struct mi_dispatch* __restrict mi = mb->mi;
 
-#define ATTR_HOT __attribute__((hot))
-
 
 #pragma region Microcode I/O
 

@@ -3,6 +3,7 @@
 #include "config.h"
 
 
+#define ATTR_HOT __attribute__((hot))
 #if PPU_IS_MONOCHROME
 typedef unsigned char pixel_t;
 #elif PPU_MODE == 4
