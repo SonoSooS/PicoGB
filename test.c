@@ -1168,6 +1168,7 @@ int main(int argc, char** argv)
                 LPWAVEHDR ohdr = bufo + toggo;
                 volatile DWORD* flags = &ohdr->dwFlags;
                 
+                /*
                 if((*flags & 0x11) == 0x10)
                 {
                     //printf("Blocked   %lu\n", toggo);
@@ -1183,6 +1184,7 @@ int main(int argc, char** argv)
                     
                     //printf("Unblocked %lu\n", toggo);
                 }
+                */
                 
                 //if(anything)
                 {
@@ -1192,6 +1194,9 @@ int main(int argc, char** argv)
                     
                     for(;;)
                     {
+                        if(ohdr->dwBytesRecorded >= ohdr->dwBufferLength)
+                            break;
+                        
                         s32 sum_l = 0;
                         s32 sum_r = 0;
                         
@@ -1214,9 +1219,6 @@ int main(int argc, char** argv)
                             apu.outbuf_pos = 0;
                             break;
                         }
-                        
-                        if(ohdr->dwBytesRecorded >= ohdr->dwBufferLength)
-                            break;
                     }
                     
                     
@@ -1225,7 +1227,17 @@ int main(int argc, char** argv)
                     {
                         ohdr->dwBytesRecorded = ohdr->dwBufferLength;
                         
-                        waveOutWrite(hwow, ohdr, sizeof(WAVEHDR));
+                        HRESULT res;
+                        for(;;)
+                        {
+                            res = waveOutWrite(hwow, ohdr, sizeof(WAVEHDR));
+                            
+                            if(!res)
+                                break;
+                            
+                            int64_t dumb = -1;
+                            NtDelayExecution(1, &dumb);
+                        }
                         
                         if(++toggo >= cnto)
                             toggo = 0;
