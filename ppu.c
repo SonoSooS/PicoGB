@@ -259,6 +259,10 @@ PGB_FUNC static void ppu_render_tile_line(self, pixel_t* __restrict scanline, co
             
         #if PPU_IS_MONOCHROME
             
+        #if CONFIG_PPU_INVERT
+            bd ^= 3;
+        #endif
+            
             #if PPU_IS_DITHER
             px = (px << PPU_IS_BPP) | ditherbuf[bd][spos ^ (j & ((1 << PPU_IS_BPP) - 1))];
             #else
@@ -266,7 +270,7 @@ PGB_FUNC static void ppu_render_tile_line(self, pixel_t* __restrict scanline, co
             #endif
             pm = (pm << PPU_IS_BPP) | ((1 << PPU_IS_BPP) - 1);
             
-            #else
+        #else
             
             px = palette
         #if CONFIG_PPU_INVERT

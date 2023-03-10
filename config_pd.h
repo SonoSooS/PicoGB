@@ -10,13 +10,13 @@
 #define CONFIG_NOBOOTMEME
 //#define CONFIG_IS_CGB
 //#define CONFIG_VSYNC
-//#define CONFIG_PPU_INVERT
+#define CONFIG_PPU_INVERT
 
 // 0 - default 32bit full-color
 // 1 - 1bpp jankdither globally fixed
 // 2 - 1bpp nodither
 // 3 - 1bpp jankdither locally fixed
-#define PPU_MODE 3
+#define PPU_MODE 2
 
 // 0 - no interlacing
 // 1 - full frame interlacing (half FPS)

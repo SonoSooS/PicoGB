@@ -2,7 +2,7 @@
 
 //#define PICOGB_RP2 1
 
-#ifdef PICOGB_PD
+#if defined(PICOGB_PD) || defined(TARGET_SIMULATOR)
 #define NO_ASSERT
 #include "config_pd.h"
 #elif defined(PICO_NO_FPGA_CHECK) || defined(PICOGB_RP2)
