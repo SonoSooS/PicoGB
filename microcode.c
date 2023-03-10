@@ -74,7 +74,7 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
         }
         
     #if CONFIG_ENABLE_LRU
-        ret = mch_resolve_mic_bank_internal(mb, r_addr);
+        ret = mch_resolve_mic_bank_internal(mb, r_addr << MICACHE_R_BITS);
     #endif
         return ret;
     }
