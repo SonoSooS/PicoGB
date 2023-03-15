@@ -478,9 +478,7 @@ PGB_FUNC static void ppu_update_newline(self, word scanY)
         
         pp->_internal_WY = 0;
         
-    #if !PPU_SCANLINE_UPDATES
-        pp->_redrawed = 1;
-    #endif
+        pp->_redrawed = 255;
     }
 }
 
@@ -569,15 +567,14 @@ PGB_FUNC static inline void ppu_tick_internal_2(self)
     }
     #else
     ppu_render_scanline(pp);
+    
+#if PPU_SCANLINE_UPDATES
+    pp->_redrawed = scanY + 1;
+#endif
     #endif
     
     if((pp->rLCDC & 0x20) && (pp->rWY <= scanY) && (pp->rWX < 168) && pp->rWX)
         ++(pp->_internal_WY);
-    
-    
-#if PPU_SCANLINE_UPDATES
-    pp->_redrawed = 1;
-#endif
 }
 
 PGB_FUNC static inline void ppu_tick_internal_3(self)
