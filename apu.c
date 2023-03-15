@@ -13,10 +13,10 @@ void apu_initialize(apu_t* __restrict pp);
 #define APU_DIV_64Hz 0x3FF8
 */
 
-#define APU_DIV_512Hz 0x1F8
-#define APU_DIV_256Hz 0x3F8
-#define APU_DIV_128Hz 0x7F8
-#define APU_DIV_64Hz 0xFF8
+#define APU_DIV_512Hz (0x7FF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_256Hz (0xFFF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_128Hz (0x1FFF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_64Hz  (0x3FFF & ~(APU_N_PER_TICK - 1))
 
 #define APU_BIAS 8
 
@@ -44,6 +44,9 @@ void apu_reset(apu_t* __restrict pp)
     pp->ch[3].vol = 0;
     
     pp->MASTER_CFG &= 0xFF70FFFF;
+    
+    pp->CTR_INT = 0;
+    pp->CTR_INT_FRAC = 0;
 }
 
 void apu_initialize(apu_t* __restrict pp)
@@ -52,6 +55,8 @@ void apu_initialize(apu_t* __restrict pp)
     
     pp->outbuf_pos = 0;
     pp->CTR_DIV = 0;
+    pp->CTR_INT = 0;
+    pp->CTR_INT_FRAC = 0;
     pp->MASTER_CFG = 0;
 }
 
@@ -341,7 +346,7 @@ static s16 apuch_tick_ch4(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    if(!((ch->ctr)++ & ((1 << ((ch->NR_RAW[3] >> 4) + 1)) - 1)))
+    if(!((ch->ctr)++ & ((1 << ((ch->NR_RAW[3] >> 4) + 0)) - 1)))
     {
         if(--ch->sample_no)
             ;

@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-
+#define APU_N_PER_TICK 8
 
 struct apu_ch_t
 {
@@ -23,12 +23,13 @@ struct apu_t
     
     var MASTER_CFG;
     var CTR_INT;
+    var CTR_INT_FRAC;
     var CTR_DIV;
     var outbuf_pos;
     
     r8 WVRAM[16];
     
-    s16 outbuf[2*8*32768];
+    s16 outbuf[2*APU_N_PER_TICK*32768];
 };
 
 typedef struct apu_t apu_t;
@@ -47,18 +48,17 @@ PGB_FUNC static inline void apu_tick(apu_t* __restrict pp, word ncycles)
 {
     if(pp->MASTER_CFG & (1 << 23))
     {
-        word nloops = ((pp->CTR_INT & 7) + ncycles) / 8;
+        pp->CTR_INT_FRAC += ncycles;
         
-        while(nloops--)
+        while(pp->CTR_INT_FRAC >= APU_N_PER_TICK)
         {
+            pp->CTR_INT_FRAC -= APU_N_PER_TICK;
+            
             apu_tick_internal(pp);
             
-            pp->CTR_INT += 8;
-            pp->CTR_DIV += 8;
+            pp->CTR_INT += APU_N_PER_TICK;
+            pp->CTR_DIV += APU_N_PER_TICK;
         }
-        
-        pp->CTR_INT += ncycles & 7;
-        pp->CTR_DIV += ncycles & 7;
     }
     else
     {
