@@ -13,10 +13,10 @@ void apu_initialize(apu_t* __restrict pp);
 #define APU_DIV_64Hz 0x3FF8
 */
 
-#define APU_DIV_512Hz (0x7FF & ~(APU_N_PER_TICK - 1))
-#define APU_DIV_256Hz (0xFFF & ~(APU_N_PER_TICK - 1))
-#define APU_DIV_128Hz (0x1FFF & ~(APU_N_PER_TICK - 1))
-#define APU_DIV_64Hz  (0x3FFF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_512Hz (0x1FF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_256Hz (0x3FF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_128Hz (0x7FF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_64Hz  (0xFFF & ~(APU_N_PER_TICK - 1))
 
 #define APU_BIAS 8
 
@@ -296,7 +296,7 @@ static void apuch_update_volenv(struct apu_ch_t* __restrict ch)
     }
 }
 
-static s32 apuch_tick_ch1(apu_t* __restrict pp, word _ch)
+static sword apuch_tick_ch1(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
@@ -312,7 +312,7 @@ static s32 apuch_tick_ch1(apu_t* __restrict pp, word _ch)
     return (((patterns[ch->sample_type] >> ch->sample_no) & 1) ? -1 : 0) * ch->vol;
 }
 
-static s32 apuch_tick_ch3(apu_t* __restrict pp, word _ch)
+static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
@@ -342,7 +342,7 @@ static s32 apuch_tick_ch3(apu_t* __restrict pp, word _ch)
     }
 }
 
-static s16 apuch_tick_ch4(apu_t* __restrict pp, word _ch)
+static sword apuch_tick_ch4(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
@@ -379,11 +379,64 @@ static s16 apuch_tick_ch4(apu_t* __restrict pp, word _ch)
     return ((ch->raw & 1) ? 1 : 0) * ch->vol;
 }
 
-void apu_tick_internal(apu_t* __restrict pp)
+void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
 {
-    var i;
+    var i, j;
     
-    
+    for(j = 0; j != ncounts; j++)
+    for(i = 0; i != APU_N_PER_TICK; i++)
+    {
+        s32 out_r = 0;
+        s32 out_l = 0;
+        
+        s16 s;
+        
+        if(pp->ch[0].vol)
+        {
+            s = apuch_tick_ch1(pp, 0);
+            if(pp->MASTER_CFG & (1 << 8))
+                out_r += s;
+            if(pp->MASTER_CFG & (1 << 12))
+                out_l += s;
+        }
+        
+        if(pp->ch[1].vol)
+        {
+            s = apuch_tick_ch1(pp, 1);
+            if(pp->MASTER_CFG & (1 << 9))
+                out_r += s;
+            if(pp->MASTER_CFG & (1 << 13))
+                out_l += s;
+        }
+        
+        if(pp->ch[2].vol)
+        {
+            s = apuch_tick_ch3(pp, 2);
+            if(pp->MASTER_CFG & (1 << 10))
+                out_r += s;
+            if(pp->MASTER_CFG & (1 << 14))
+                out_l += s;
+        }
+        
+        if(pp->ch[3].vol)
+        {
+            s = apuch_tick_ch4(pp, 3);
+            if(pp->MASTER_CFG & (1 << 11))
+                out_r += s;
+            if(pp->MASTER_CFG & (1 << 15))
+                out_l += s;
+        }
+        
+        out_r *= ((pp->MASTER_CFG >> 0) & 7) + 1;
+        out_l *= ((pp->MASTER_CFG >> 4) & 7) + 1;
+        
+        *(outbuf++) = out_l * 8;
+        *(outbuf++) = out_r * 8;
+    }
+}
+
+void apu_tick_internal_internals(apu_t* __restrict pp)
+{
     if(!(pp->CTR_DIV & APU_DIV_256Hz))
     {
         apuch_update_length(&pp->ch[0]);
@@ -444,58 +497,16 @@ void apu_tick_internal(apu_t* __restrict pp)
     if(!(pp->ch[1].vol)) pp->MASTER_CFG &= 0xFFFDFFFF;
     if(!(pp->ch[2].vol)) pp->MASTER_CFG &= 0xFFFBFFFF;
     if(!(pp->ch[3].vol)) pp->MASTER_CFG &= 0xFFF7FFFF;
+}
+
+void apu_tick_internal(apu_t* __restrict pp)
+{
+    apu_tick_internal_internals(pp);
     
     if(pp->outbuf_pos >= (sizeof(pp->outbuf)/sizeof(pp->outbuf[0])))
         return;
     
-    s16 out_r = 0;
-    s16 out_l = 0;
-    
-    for(i = 0; i != 8; i++)
-    {
-        s16 s;
-        
-        if(pp->ch[0].vol)
-        {
-            s = apuch_tick_ch1(pp, 0);
-            if(pp->MASTER_CFG & (1 << 8))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 12))
-                out_l += s;
-        }
-        
-        if(pp->ch[1].vol)
-        {
-            s = apuch_tick_ch1(pp, 1);
-            if(pp->MASTER_CFG & (1 << 9))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 13))
-                out_l += s;
-        }
-        
-        if(pp->ch[2].vol)
-        {
-            s = apuch_tick_ch3(pp, 2);
-            if(pp->MASTER_CFG & (1 << 10))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 14))
-                out_l += s;
-        }
-        
-        if(pp->ch[3].vol)
-        {
-            s = apuch_tick_ch4(pp, 3);
-            if(pp->MASTER_CFG & (1 << 11))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 15))
-                out_l += s;
-        }
-    }
-    
-    out_r *= ((pp->MASTER_CFG >> 0) & 7) + 1;
-    out_l *= ((pp->MASTER_CFG >> 4) & 7) + 1;
-    
-    pp->outbuf[pp->outbuf_pos++] = out_l;
-    pp->outbuf[pp->outbuf_pos++] = out_r;
+    apu_render(pp, &pp->outbuf[pp->outbuf_pos], 1);
+    pp->outbuf_pos += 2;
 }
 

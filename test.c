@@ -1167,7 +1167,7 @@ int main(int argc, char** argv)
         #if CONFIG_APU_ENABLE
         if(hwow)
         {
-            apu_tick(&apu, cycles);
+            apu_tick(&apu, cycles, 1);
             
             var k = 0;
             j = apu.outbuf_pos >> 1;

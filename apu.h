@@ -42,9 +42,11 @@ word apu_read(apu_t* __restrict pp, word addr);
 void apu_write_wave(apu_t* __restrict pp, word addr, word data);
 word apu_read_wave(apu_t* __restrict pp, word addr);
 
+void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts);
+void apu_tick_internal_internals(apu_t* __restrict pp);
 void apu_tick_internal(apu_t* __restrict pp);
 
-PGB_FUNC static inline void apu_tick(apu_t* __restrict pp, word ncycles)
+PGB_FUNC static inline void apu_tick(apu_t* __restrict pp, word ncycles, wbool render)
 {
     if(pp->MASTER_CFG & (1 << 23))
     {
@@ -54,7 +56,10 @@ PGB_FUNC static inline void apu_tick(apu_t* __restrict pp, word ncycles)
         {
             pp->CTR_INT_FRAC -= APU_N_PER_TICK;
             
-            apu_tick_internal(pp);
+            if(!render)
+                apu_tick_internal_internals(pp);
+            else
+                apu_tick_internal(pp);
             
             pp->CTR_INT += APU_N_PER_TICK;
             pp->CTR_DIV += APU_N_PER_TICK;

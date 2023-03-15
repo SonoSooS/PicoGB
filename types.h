@@ -22,11 +22,15 @@ typedef unsigned int pixel_t;
 #endif
 
 typedef unsigned int word;
+typedef signed int sword;
 #if !GBA
 typedef unsigned int var;
+typedef signed int svar;
 #else
 //typedef unsigned short var;
+//typedef signed short svar;
 typedef unsigned int var;
+typedef signed int svar;
 #endif
 
 typedef word wbool;
