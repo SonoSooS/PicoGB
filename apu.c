@@ -13,10 +13,10 @@ void apu_initialize(apu_t* __restrict pp);
 #define APU_DIV_64Hz 0x3FF8
 */
 
-#define APU_DIV_512Hz (0x1FF & ~(APU_N_PER_TICK - 1))
-#define APU_DIV_256Hz (0x3FF & ~(APU_N_PER_TICK - 1))
-#define APU_DIV_128Hz (0x7FF & ~(APU_N_PER_TICK - 1))
-#define APU_DIV_64Hz  (0xFFF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_512Hz (0x3FF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_256Hz (0x7FF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_128Hz (0xFFF & ~(APU_N_PER_TICK - 1))
+#define APU_DIV_64Hz  (0x1FFF & ~(APU_N_PER_TICK - 1))
 
 #define APU_BIAS 8
 
@@ -430,8 +430,8 @@ void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
         out_r *= ((pp->MASTER_CFG >> 0) & 7) + 1;
         out_l *= ((pp->MASTER_CFG >> 4) & 7) + 1;
         
-        *(outbuf++) = out_l * 8;
-        *(outbuf++) = out_r * 8;
+        *(outbuf++) = out_l * 16;
+        *(outbuf++) = out_r * 16;
     }
 }
 
