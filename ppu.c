@@ -567,11 +567,11 @@ PGB_FUNC static inline void ppu_tick_internal_2(self)
     }
     #else
     ppu_render_scanline(pp);
+    #endif
     
 #if PPU_SCANLINE_UPDATES
     pp->_redrawed = scanY + 1;
 #endif
-    #endif
     
     if((pp->rLCDC & 0x20) && (pp->rWY <= scanY) && (pp->rWX < 168) && pp->rWX)
         ++(pp->_internal_WY);
