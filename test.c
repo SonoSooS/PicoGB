@@ -45,7 +45,7 @@ const char* rompath = "C:\\Downloads\\cpu_instrs.gb";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Castlevania - The Adventure (Europe).gb";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Felix the Cat (USA, Europe).gb";
 
-#if CONFIG_BOOTMEME
+#if CONFIG_BOOTMEME && !CONFIG_NOBOOTMEME
 const word CPU_START = 0;
 #else
 const word CPU_START = 0x100;

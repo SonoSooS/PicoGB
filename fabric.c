@@ -386,6 +386,13 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     
                     //micache_invalidate(&ud->mb->micache);
                     micache_invalidate_range(&ud->mb->micache, 0x0000, 0x7FFF);
+                    
+                #if CONFIG_BOOTMEME
+                    if(ud->mb->mi->dispatch_BOOTROM)
+                        ud->mb->mi->dispatch_BOOTROM(userdata, 0, 0, MI_LONGDISPATCH_BOOTROM_LOCK);
+                    ud->mb->mi->dispatch_BOOTROM = 0; // disable iboot interface
+                #endif
+                    
                     return data;
                 }
                 
@@ -481,6 +488,33 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 return ud->mb->mi->BANK_WRAM | 0xF8;
             #endif
             }
+        #if CONFIG_BOOTMEME
+            else if(ud->mb->mi->dispatch_BOOTROM && reg >= 0x74 && reg <= 0x7C)
+            {
+                reg -= 0x74;
+                if(reg < 8)
+                {
+                    if(type)
+                        ud->mb->mi->BOOTROM_DATA[reg] = data;
+                    else
+                        return ud->mb->mi->BOOTROM_DATA[reg];
+                    
+                    return data;
+                }
+                else if(type && ud->mb->mi->dispatch_BOOTROM)
+                {
+                    r32 res = ud->mb->mi->dispatch_BOOTROM
+                    (
+                        userdata,
+                        mi_iboot_get_offset(ud->mb->mi),
+                        mi_iboot_get_data(ud->mb->mi),
+                        data
+                    );
+                    
+                    mi_iboot_set_data(ud->mb->mi, res);
+                }
+            }
+        #endif
         }
         
         return 0xFF;
@@ -620,6 +654,30 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
     
     return 0xFF;
 }
+
+#if CONFIG_BOOTMEME
+PGB_FUNC r32 pgf_cb_BOOTROM(void* userdata, r32 addr, r32 data, word type)
+{
+    USE_UD;
+    
+    const r8* __restrict ptr = (const r8* __restrict)ud->mb->mi->userdata_BOOTROM;
+    
+    if(type == MI_LONGDISPATCH_READ_8 && ptr)
+    {
+        return ptr[addr];
+    }
+    else if(type == MI_LONGDISPATCH_READ_32 && ptr)
+    {
+        return *(const r32* __restrict)&ptr[addr];
+    }
+    else if(type == MI_LONGDISPATCH_BOOTROM_LOCK)
+    {
+        micache_invalidate(&ud->mb->micache);
+    }
+    
+    return ~0;
+}
+#endif
 
 #if CONFIG_ENABLE_LRU
 PGB_FUNC const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)

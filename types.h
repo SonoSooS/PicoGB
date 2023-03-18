@@ -38,6 +38,7 @@ typedef var vbool;
 
 typedef unsigned char r8;
 typedef unsigned short r16;
+typedef unsigned long int r32;
 
 typedef signed short s16;
 typedef signed long int s32;
