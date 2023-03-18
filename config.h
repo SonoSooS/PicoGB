@@ -1,8 +1,9 @@
 #pragma once
 
 //#define PICOGB_RP2 1
+//#define PICOGB_PD 1
 
-#if defined(PICOGB_PD) || defined(TARGET_SIMULATOR)
+#if defined(PICOGB_PD) || (defined(TARGET_SIMULATOR) && TARGET_SIMULATOR)
 #define NO_ASSERT
 #include "config_pd.h"
 #elif defined(PICO_NO_FPGA_CHECK) || defined(PICOGB_RP2)

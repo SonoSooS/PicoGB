@@ -13,16 +13,16 @@ typedef struct popcounter
 
 static inline void popcounter_reset(popcounter_t* __restrict dt)
 {
-    dt->cur = dt->reload;
+    dt->current = dt->reload;
 }
 
 static inline wbool popcounter_advance(popcounter_t* __restrict dt)
 {
-    vbool ret = dt->cur & 1;
+    vbool ret = dt->current & 1;
     
-    dt->cur >>= 1;
-    if(!dt->cur)
-        dt->cur = dt->reload;
+    dt->current >>= 1;
+    if(!dt->current)
+        dt->current = dt->reload;
     
     return ret;
 }

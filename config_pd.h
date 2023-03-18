@@ -3,7 +3,7 @@
 //#define CONFIG_DBG
 //#define CONFIG_DBG_IO
 //#define GBA
-//#define PPU_SCANLINE_UPDATES
+#define PPU_SCANLINE_UPDATES
 //#define CONFIG_DOCTOR
 //#define CONFIG_LYC_90
 //#define CONFIG_BOOTMEME
