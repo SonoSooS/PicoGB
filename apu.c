@@ -383,55 +383,59 @@ void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
 {
     var i, j;
     
+    word mcfg = pp->MASTER_CFG;
+    
     for(j = 0; j != ncounts; j++)
-    for(i = 0; i != APU_N_PER_TICK; i++)
     {
         s32 out_r = 0;
         s32 out_l = 0;
         
-        s16 s;
-        
-        if(pp->ch[0].vol)
+        for(i = 0; i != APU_N_PER_TICK; i++)
         {
-            s = apuch_tick_ch1(pp, 0);
-            if(pp->MASTER_CFG & (1 << 8))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 12))
-                out_l += s;
+            s16 s;
+            
+            if(pp->ch[0].vol)
+            {
+                s = apuch_tick_ch1(pp, 0);
+                if(mcfg & (1 << 8))
+                    out_r += s;
+                if(mcfg & (1 << 12))
+                    out_l += s;
+            }
+            
+            if(pp->ch[1].vol)
+            {
+                s = apuch_tick_ch1(pp, 1);
+                if(mcfg & (1 << 9))
+                    out_r += s;
+                if(mcfg & (1 << 13))
+                    out_l += s;
+            }
+            
+            if(pp->ch[2].vol)
+            {
+                s = apuch_tick_ch3(pp, 2);
+                if(mcfg & (1 << 10))
+                    out_r += s;
+                if(mcfg & (1 << 14))
+                    out_l += s;
+            }
+            
+            if(pp->ch[3].vol)
+            {
+                s = apuch_tick_ch4(pp, 3);
+                if(mcfg & (1 << 11))
+                    out_r += s;
+                if(mcfg & (1 << 15))
+                    out_l += s;
+            }
         }
         
-        if(pp->ch[1].vol)
-        {
-            s = apuch_tick_ch1(pp, 1);
-            if(pp->MASTER_CFG & (1 << 9))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 13))
-                out_l += s;
-        }
+        out_r *= ((mcfg >> 0) & 7) + 1;
+        out_l *= ((mcfg >> 4) & 7) + 1;
         
-        if(pp->ch[2].vol)
-        {
-            s = apuch_tick_ch3(pp, 2);
-            if(pp->MASTER_CFG & (1 << 10))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 14))
-                out_l += s;
-        }
-        
-        if(pp->ch[3].vol)
-        {
-            s = apuch_tick_ch4(pp, 3);
-            if(pp->MASTER_CFG & (1 << 11))
-                out_r += s;
-            if(pp->MASTER_CFG & (1 << 15))
-                out_l += s;
-        }
-        
-        out_r *= ((pp->MASTER_CFG >> 0) & 7) + 1;
-        out_l *= ((pp->MASTER_CFG >> 4) & 7) + 1;
-        
-        *(outbuf++) = out_l * 16;
-        *(outbuf++) = out_r * 16;
+        *(outbuf++) = out_l * 1;
+        *(outbuf++) = out_r * 1;
     }
 }
 
