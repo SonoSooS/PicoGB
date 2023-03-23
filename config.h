@@ -26,6 +26,7 @@
 #define CONFIG_APU_ENABLE
 #define CONFIG_APU_RICH
 #define CONFIG_APU_MONO
+#define CONFIG_APU_N_PER_TICK 8
 //#define CONFIG_ENABLE_LRU
 
 // 0 - none
@@ -211,4 +212,8 @@
 #else
 #undef CONFIG_FORCE_ENABLE_CGB
 #define CONFIG_FORCE_ENABLE_CGB 1
+#endif
+
+#ifndef CONFIG_APU_N_PER_TICK
+#define CONFIG_APU_N_PER_TICK 8
 #endif

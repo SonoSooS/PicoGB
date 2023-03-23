@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-#define APU_N_PER_TICK 8
+#define APU_N_PER_TICK CONFIG_APU_N_PER_TICK
 
 struct apu_ch_t
 {

@@ -11,6 +11,8 @@
 //#define CONFIG_IS_CGB
 //#define CONFIG_VSYNC
 #define CONFIG_PPU_INVERT
+#define CONFIG_APU_ENABLE
+#define CONFIG_APU_N_PER_TICK 32
 
 // 0 - default 32bit full-color
 // 1 - 1bpp jankdither globally fixed
