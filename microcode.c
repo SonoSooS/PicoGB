@@ -1838,16 +1838,15 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
     
     generic_fetch_halt:
     {
-        //mb->HALTING = !(mb->IE & mb->IF & 0x1F);
-        mb->HALTING = 1;
+        mb->HALTING = !(mb->IE & mb->IF & 0x1F) && !mb->IME && !mb->IME_ASK;
+        //mb->HALTING = 1;
         
-        //var PC = mb->PC;
+        var PC = mb->PC;
         mb->IR.raw = mch_memory_fetch_PC(mb);
-        /*
-        mb->PC = PC;
-        if(mb->HALTING)
-            mb->IR.raw = 0x00; // NOP
-        */
+        
+        if(!mb->HALTING)
+            mb->PC = PC;
+        
         return ncycles + 1;
     }
     
