@@ -1122,39 +1122,6 @@ int main(int argc, char** argv)
                 wnd_update(wnd);
             }
             
-            /*
-            var k,v;
-            
-            for(v = 0; v != 0x19; ++v)
-            {
-                printf("%02X: ", v);
-                
-                const r8* __restrict shit = &pp.VRAM[v << 4];
-                
-                for(k = 0; k != 16; ++k)
-                {
-                    printf(" %02X", shit[k]);
-                }
-                
-                puts("");
-            }
-            
-            for(v = 0; v != 32; ++v)
-            {
-                for(k = 0; k != 32; ++k)
-                {
-                    var val = pp.VRAM[0x1800 + (v * 32) + k];
-                    
-                    if(val)
-                        printf(" %02X", val);
-                    else
-                        printf(" %c%c", '-', '-');
-                }
-                
-                puts("");
-            }
-            */
-            
             wnd_update_loop(wnd);
             break;
         }
