@@ -371,7 +371,7 @@ static sword apuch_tick_ch4(apu_t* __restrict pp, word _ch)
     
     if(ch->vol > 0x10)
     {
-        printf("ERROR: EARRAPE DETECTED AT %u\n", ch->vol);
+        //printf("ERROR: EARRAPE DETECTED AT %u\n", ch->vol);
         ch->vol = 1;
     }
     
