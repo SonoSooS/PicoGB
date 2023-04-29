@@ -6,12 +6,10 @@ void apu_reset(apu_t* __restrict pp);
 void apu_initialize(apu_t* __restrict pp);
 
 
-/*
-#define APU_DIV_512Hz 0x7F8
-#define APU_DIV_256Hz 0xFF8
-#define APU_DIV_128Hz 0x1FF8
-#define APU_DIV_64Hz 0x3FF8
-*/
+//#define APU_DIV_512Hz (0x3FF & ~(APU_N_PER_TICK - 1))
+//#define APU_DIV_256Hz (0x7FF & ~(APU_N_PER_TICK - 1))
+//#define APU_DIV_128Hz (0xFFF & ~(APU_N_PER_TICK - 1))
+//#define APU_DIV_64Hz  (0x1FFF & ~(APU_N_PER_TICK - 1))
 
 #define APU_DIV_512Hz (0x3FF & ~(APU_N_PER_TICK - 1))
 #define APU_DIV_256Hz (0x7FF & ~(APU_N_PER_TICK - 1))
@@ -64,21 +62,22 @@ static void apu_init_ch3(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    if(!(ch->NR_RAW[4] & 0x80))
-        return;
-    
-    ch->vol = 1;
-    
-    pp->MASTER_CFG |= 1 << (_ch + 24);
-    
     ch->length_ctr = (~ch->NR_RAW[1]) & 0xFF;
-    ch->sweep_ctr = 0;
     
     ch->reload = (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8)) & 0x7FF) >> 1; //HACK: 2MHz DAC bleh
-    ch->ctr = ch->reload;
-    ch->sample_no = 1;
     
-    ch->raw = (ch->NR_RAW[2] >> 5) & 3;
+    if(ch->NR_RAW[4] & 0x80)
+    {
+        ch->NR_RAW[4] &= ~0x80;
+        
+        pp->MASTER_CFG |= 1 << (_ch + 24);
+        
+        ch->vol = 1;
+        ch->sweep_ctr = 0;
+        ch->ctr = ch->reload;
+        
+        ch->sample_no = 1;
+    }
 }
 
 #include <stdio.h>
@@ -87,90 +86,96 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    /*
-    if(_ch == 0)
-    printf("trigger happy %02X %02X %02X %02X %02X\n",
-            ch->NR_RAW[0],
-            ch->NR_RAW[1],
-            ch->NR_RAW[2],
-            ch->NR_RAW[3],
-            ch->NR_RAW[4]
-            );
-    */
-    
-    if(!(ch->NR_RAW[4] & 0x80))
-        return;
-    
-    ch->vol = (ch->NR_RAW[2] >> 4) + ((ch->NR_RAW[2] >> 3) & 1);
-    if(!ch->vol)
-        return;
-    
-    pp->MASTER_CFG |= 1 << (_ch + 24);
-    
     ch->sample_type = ch->NR_RAW[1] >> 6;
     ch->length_ctr = (ch->NR_RAW[1]) & 0x3F;
     ch->sweep_ctr = ch->NR_RAW[2] & 7;
     
     if(_ch != 3)
-    {
         ch->reload = ~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8)) & 0x7FF;
-        ch->ctr = ch->reload;
-        ch->sample_no = 0;
-    }
-    else
-    {
-        ch->reload = 0;
-        ch->ctr = 0;
-        ch->sample_no = 0;
-    }
     
-    if(_ch == 0)
-        ch->raw = ch->NR_RAW[0];
-    else if(_ch == 3)
-        ch->raw = 0;
+    
+    if(ch->NR_RAW[4] & 0x80)
+    {
+        ch->NR_RAW[4] &= ~0x80;
+        
+        ch->vol = (ch->NR_RAW[2] >> 4) + ((ch->NR_RAW[2] >> 3) & 1);
+        if(!ch->vol)
+            return;
+        
+        pp->MASTER_CFG |= 1 << (_ch + 24);
+        
+        if(_ch != 3)
+        {
+            ch->ctr = ch->reload;
+            ch->sample_no = 0;
+        }
+        else // CH4
+        {
+            ch->reload = 0;
+            ch->ctr = 0;
+            ch->sample_no = 0;
+            
+            ch->raw = 0;
+        }
+    }
 }
+
+//#include <stdio.h>
 
 void apu_write(apu_t* __restrict pp, word addr, word data)
 {
     addr = (addr - 0x10) & 0x1F;
     
+    //if(addr >= (2 * 5) && addr < (3 * 5))
+    //printf("NR%u%u = %02X\n", (addr / 5) + 1, addr % 5, data);
+    
     switch(addr)
     {
-        case 0: pp->ch[0].NR_RAW[0] = data; break;
+        case 0: pp->ch[0].NR_RAW[0] = data;
+        {
+            if(!(data & (7 << 4)))
+                pp->ch[0].raw = 0;
+            
+            break;
+        }
         case 1: pp->ch[0].NR_RAW[1] = data; break;
         case 2: pp->ch[0].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[0].vol = 0; break;
-        case 3: pp->ch[0].NR_RAW[3] = data; break;
-        case 4: pp->ch[0].NR_RAW[4] = data;
+        case 3: pp->ch[0].NR_RAW[3] = data; goto apu_init_ch1_lbl;
+        case 4: pp->ch[0].NR_RAW[4] = data; goto apu_init_ch1_lbl;
+        apu_init_ch1_lbl:
         {
             apu_init_ch(pp, 0);
             break;
         }
         
         case 5: break;
-        case 6: pp->ch[1].NR_RAW[1] = data; break;
-        case 7: pp->ch[1].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[1].vol = 0; break;
-        case 8: pp->ch[1].NR_RAW[3] = data; break;
-        case 9: pp->ch[1].NR_RAW[4] = data;
+        case 6: pp->ch[1].NR_RAW[1] = data; goto apu_init_ch2_lbl;
+        case 7: pp->ch[1].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[1].vol = 0; else goto apu_init_ch2_lbl;
+        case 8: pp->ch[1].NR_RAW[3] = data; goto apu_init_ch2_lbl;
+        case 9: pp->ch[1].NR_RAW[4] = data; goto apu_init_ch2_lbl;
+        apu_init_ch2_lbl:
         {
             apu_init_ch(pp, 1);
             break;
         }
         
-        case 10: pp->ch[2].NR_RAW[0] = data; if(!(data & 0x80)) pp->ch[2].vol = 0; break;
-        case 11: pp->ch[2].NR_RAW[1] = data; break;
-        case 12: pp->ch[2].NR_RAW[2] = data; break;
-        case 13: pp->ch[2].NR_RAW[3] = data; break;
-        case 14: pp->ch[2].NR_RAW[4] = data;
+        case 10: pp->ch[2].NR_RAW[0] = data; if(!(data & 0x80)) pp->ch[2].vol = 0; else goto apu_init_ch3_lbl;
+        case 11: pp->ch[2].NR_RAW[1] = data; goto apu_init_ch3_lbl;
+        case 12: pp->ch[2].NR_RAW[2] = data; goto apu_init_ch3_lbl;
+        case 13: pp->ch[2].NR_RAW[3] = data; goto apu_init_ch3_lbl;
+        case 14: pp->ch[2].NR_RAW[4] = data; goto apu_init_ch3_lbl;
+        apu_init_ch3_lbl:
         {
             apu_init_ch3(pp, 2);
             break;
         }
         
         case 15: break;
-        case 16: pp->ch[3].NR_RAW[1] = data; break;
-        case 17: pp->ch[3].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[3].vol = 0; break;
-        case 18: pp->ch[3].NR_RAW[3] = data; break;
-        case 19: pp->ch[3].NR_RAW[4] = data;
+        case 16: pp->ch[3].NR_RAW[1] = data; goto apu_init_ch4_lbl;
+        case 17: pp->ch[3].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[3].vol = 0; else goto apu_init_ch4_lbl;
+        case 18: pp->ch[3].NR_RAW[3] = data; goto apu_init_ch4_lbl;
+        case 19: pp->ch[3].NR_RAW[4] = data; goto apu_init_ch4_lbl;
+        apu_init_ch4_lbl:
         {
             apu_init_ch(pp, 3);
             break;
@@ -198,17 +203,15 @@ void apu_write(apu_t* __restrict pp, word addr, word data)
     }
 }
 
-word apu_read(apu_t* __restrict pp, word addr)
+word apu_read_internal(apu_t* __restrict pp, word addr)
 {
-    addr = (addr - 0x10) & 0x1F;
-    
     switch(addr)
     {
-        case 0: return pp->ch[0].NR_RAW[0] | 0x80;
-        case 1: return pp->ch[0].NR_RAW[1] | 0xBF;
+        case 0: return pp->ch[0].NR_RAW[0];
+        case 1: return pp->ch[0].NR_RAW[1];
         case 2: return pp->ch[0].NR_RAW[2];
-        case 3: return pp->ch[0].NR_RAW[3] | 0xFF;
-        case 4: return pp->ch[0].NR_RAW[4] | 0xBF;
+        case 3: return pp->ch[0].NR_RAW[3];
+        case 4: return pp->ch[0].NR_RAW[4];
         
         case 5: return pp->ch[1].NR_RAW[0];
         case 6: return pp->ch[1].NR_RAW[1];
@@ -240,6 +243,22 @@ word apu_read(apu_t* __restrict pp, word addr)
             __builtin_unreachable();
             return 0xFF;
     }
+}
+
+static const r8 APU_BITS[23] =
+{
+    0x80, 0x3F, 0x00, 0xFF, 0xBF,
+    0xFF, 0x3F, 0x00, 0xFF, 0xBF,
+    0x7F, 0xFF, 0x9F, 0xFF, 0xBF,
+    0xFF, 0xFF, 0x00, 0x00, 0xBF,
+    0x00, 0x00, 0x70
+};
+
+word apu_read(apu_t* __restrict pp, word addr)
+{
+    addr = (addr - 0x10) & 0x1F;
+    
+    return apu_read_internal(pp, addr) | APU_BITS[addr];
 }
 
 void apu_write_wave(apu_t* __restrict pp, word addr, word data)
@@ -281,7 +300,7 @@ static void apuch_update_volenv(struct apu_ch_t* __restrict ch)
         return;
     }
     
-    ch->sweep_ctr = (ch->NR_RAW[2] & 7) + 1;
+    ch->sweep_ctr = (ch->NR_RAW[2] & 7) + 0;
     
     if(ch->NR_RAW[2] & 0x8)
     {
@@ -331,7 +350,7 @@ static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)
     else
         sample = (sample >> 4) & 0xF;
     
-    switch(ch->raw & 3)
+    switch((ch->NR_RAW[2] >> 5) & 3)
     {
         case 0: return 0;
         case 1: return sample - 8;
@@ -342,17 +361,22 @@ static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)
     }
 }
 
+static const r8 APUCH_CH4_MULDIV[8] =
+{
+    1, 2, 4, 6, 8, 10, 12, 14
+};
+
 static sword apuch_tick_ch4(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    if(!((ch->ctr)++ & ((1 << ((ch->NR_RAW[3] >> 4) + 0)) - 1)))
+    if(!((ch->ctr)++ & ((1 << ((ch->NR_RAW[3] >> 4) + 1)) - 1)))
     {
         if(--ch->sample_no)
             ;
         else
         {
-            ch->sample_no = (ch->NR_RAW[3] & 7);
+            ch->sample_no = APUCH_CH4_MULDIV[(ch->NR_RAW[3] & 7)];
             
             r16 rs = ch->raw;
             r16 ns = (((rs >> 1) ^ ~rs) & 1);
@@ -434,8 +458,8 @@ void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
         out_r *= ((mcfg >> 0) & 7) + 1;
         out_l *= ((mcfg >> 4) & 7) + 1;
         
-        *(outbuf++) = out_l * 1;
-        *(outbuf++) = out_r * 1;
+        *(outbuf++) = out_l * 4;
+        *(outbuf++) = out_r * 4;
     }
 }
 
@@ -456,44 +480,41 @@ void apu_tick_internal_internals(apu_t* __restrict pp)
         apuch_update_volenv(&pp->ch[3]);
     }
     
-    if(!(pp->CTR_DIV & APU_DIV_128Hz) && pp->ch[0].vol && (pp->ch[0].raw & 0x70))
+    if(!(pp->CTR_DIV & APU_DIV_128Hz) && pp->ch[0].vol && (pp->ch[0].NR_RAW[0] & 0x70))
     {
-        /*printf("sweep sweep %02X %02X %02X %02X %02X\n",
-            pp->ch[0].NR_RAW[0],
-            pp->ch[0].NR_RAW[1],
-            pp->ch[0].NR_RAW[2],
-            pp->ch[0].NR_RAW[3],
-            pp->ch[0].NR_RAW[4]
-            );
-        */
-        
-        if(pp->ch[0].sweep_ctr)
-            --(pp->ch[0].sweep_ctr);
+        if(pp->ch[0].raw)
+            --(pp->ch[0].raw);
         else
         {
-            var reload = pp->ch[0].reload;
-            var newvar = (reload >> ((pp->ch[0].raw & 7) + 0));
+            struct apu_ch_t* ch0 = &pp->ch[0];
             
-            pp->ch[0].sweep_ctr = (pp->ch[0].raw >> 4) & 7;
+            //var reload = pp->ch[0].reload;
+            var reload = ch0->NR_RAW[3] | ((ch0->NR_RAW[4] & 7) << 8);
+            var newvar = (reload >> ((ch0->NR_RAW[0] & 7) + 0));
+            
+            ch0->raw = (ch0->NR_RAW[0] >> 4) & 7;
             
             //pp->ch[0].ctr = 0;
             
-            if(!(pp->ch[0].raw & 8))
+            if((ch0->NR_RAW[0] & 8))
             {
                 if(newvar >= reload)
-                    pp->ch[0].vol = 0;
+                    ch0->vol = 0;
                 else
-                    pp->ch[0].reload = reload - newvar;
+                    reload -= newvar;
             }
             else
             {
                 reload += newvar;
-                if(0x3FF < reload)
-                //    pp->ch[0].vol = 0;
-                    reload = 0x3FF;
-                //else
-                    pp->ch[0].reload = reload;
+                if(0x7FF < reload)
+                    reload = 0x7FF;
             }
+            
+            ch0->NR_RAW[3] = reload & 0xFF;
+            ch0->NR_RAW[4] &= ~7;
+            ch0->NR_RAW[4] |= (reload >> 8) & 7;
+            
+            apu_init_ch(pp, 0);
         }
     }
     

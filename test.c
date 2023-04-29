@@ -133,7 +133,7 @@ static void dis_alloc(struct mi_dispatch* __restrict dis)
 {
     dis->WRAM = malloc(0x1000 * 8);
     dis->VRAM = malloc(0x2000 * 2);
-    dis->SRAM = malloc(0x2000 * 4);
+    dis->SRAM = malloc(0x2000 * 16);
     
     dis->BANK_ROM = 1;
     dis->BANK_WRAM = 1;
@@ -947,7 +947,7 @@ int main(int argc, char** argv)
         userdata.JOYP_RAW = 0;
         
         dis.N_ROM = fs >> 14;
-        dis.N_SRAM = 4;
+        dis.N_SRAM = 16;
         dis.userdata = &userdata;
         dis.dispatch_IO = cb_IO;
         dis.dispatch_ROM = cb_ROM;

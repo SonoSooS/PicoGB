@@ -636,7 +636,7 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
                     break;
                 case 4:
                 case 5:
-                    ud->mb->mi->BANK_SRAM = (data & 3) & (ud->mb->mi->N_SRAM - 1);
+                    ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
                     micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
                     break;
                 default:
