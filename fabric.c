@@ -474,10 +474,14 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     }
                 }
                 
+                /*
                 if(ud->GDMA_CNT & 0x80)
                     return ud->GDMA_CNT;
                 else
                     return 0xFF;
+                */
+                
+                return 0xFF;
             }
         #endif
         }

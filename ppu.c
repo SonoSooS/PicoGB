@@ -131,6 +131,13 @@ PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite(self, word i
     return &pp->VRAM[(idx << 4) | (line << 1)];
 }
 
+#if CONFIG_IS_CGB
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(self, word idx, word line)
+{
+    return &pp->VRAM[((idx << 4) | (line << 1)) | 0x2000];
+}
+#endif
+
 #if PPU_IS_DITHER
 #if CONFIG_PPU_INVERT
 static const pixel_t ditherbuf[4][4] PGB_DATA =
@@ -429,7 +436,16 @@ PGB_FUNC static void ppu_render_scanline(self)
             objLine &= 15;
             dstX = posX;
             
-            const r8* __restrict tiledata = ppu_resolve_line_sprite(pp, tile, objLine);
+            const r8* __restrict tiledata;
+            
+        #if CONFIG_IS_CGB
+            if(!IS_CGB || !(attr & (1 << 3)))
+        #endif
+                tiledata = ppu_resolve_line_sprite(pp, tile, objLine);
+        #if CONFIG_IS_CGB
+            else
+                tiledata = ppu_resolve_line_sprite_cgb1(pp, tile, objLine);
+        #endif
             
             ppu_render_tile_line(pp, &scanline[dstX / PPU_IS_IPP], tiledata, attr | pattern | SCO_CALC | DITHER_PATTERN);
         }
