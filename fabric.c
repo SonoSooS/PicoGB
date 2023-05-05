@@ -441,23 +441,22 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 0x55)
             {
-                return 0xFF;
-                
                 if(type)
                 {
                     ud->GDMA_CNT = data & 0xFF;
                     
-                    if(ud->GDMA_CNT & 0x80)
                     {
                         var count = (ud->GDMA_CNT & 0x7F) + 1;
                         
                         while(count)
                         {
                             --count;
-                            const r8* __restrict SRC = pgf_resolve_octant(userdata, (ud->GDMA_SRC >> 8) & 0xFF) + (ud->GDMA_SRC & 0x00F0);
+                            const r8* __restrict SRC = pgf_resolve_octant(userdata, (ud->GDMA_SRC >> 8) & 0xFF);
                             
                             if(SRC)
                             {
+                                SRC += (ud->GDMA_SRC & 0x00F0);
+                                
                                 r8* __restrict DST = &ud->mb->mi->VRAM[(ud->mb->mi->BANK_VRAM << 13) + (ud->GDMA_DST & 0x1FF0)];
                                 
                                 var count_sub = 0x10;
