@@ -867,75 +867,77 @@ int main(int argc, char** argv)
             apu_write(&apu, 0x21, 0x00);
             apu_write(&apu, 0x22, 0x00);
             apu_write(&apu, 0x23, 0xBF);
+        }
             
-            if(IS_CGB)
+        if(IS_CGB)
+        {
+            mb.reg.A = 0x11;
+            mb.reg.BC = 0x0000;
+            mb.reg.DE = 0xFF56;
+            mb.reg.HL = 0x000D;
+            mb.reg.F = 0x80;
+            
+            FILE* f = 0;
+            #if !CONFIG_NOBOOTMEME
+            //f = fopen("../testrom_cgb.gbc", "rb");
+            //#error no
+            #endif
+            if(f)
             {
-                mb.reg.A = 0x11;
-                mb.reg.BC = 0x0000;
-                mb.reg.DE = 0xFF56;
-                mb.reg.HL = 0x000D;
-                mb.reg.F = 0x80;
+                //TODO: bad memory leak
+                r8* asd = malloc(0x1000);
                 
-                FILE* f = 0;
-                #if !CONFIG_NOBOOTMEME
-                //f = fopen("../testrom_cgb.gbc", "rb");
-                #error no
+                fread(asd, 0x900, 1, f);
+                fclose(f);
+                
+                //memcpy(&asd[0x100], &dis.ROM[0x100], 0x50);
+                
+                //mb.micache.mc_read = asd;
+                //mb.micache.mc_execute = asd;
+                //mb.micache.r_read = 0;
+                //mb.micache.r_execute = 0;
+                
+                mb.PC = 0;
+                mb.DIV = 0;
+                
+                pp.rLCDC = 0;
+                pp.rSTAT = 0;
+                
+                #if CONFIG_DBG
+                _IS_DBG = 0;
                 #endif
-                if(f)
-                {
-                    //TODO: bad memory leak
-                    r8* asd = malloc(0x1000);
-                    
-                    fread(asd, 0x900, 1, f);
-                    fclose(f);
-                    
-                    //memcpy(&asd[0x100], &dis.ROM[0x100], 0x50);
-                    
-                    //mb.micache.mc_read = asd;
-                    //mb.micache.mc_execute = asd;
-                    //mb.micache.r_read = 0;
-                    //mb.micache.r_execute = 0;
-                    
-                    mb.PC = 0;
-                    mb.DIV = 0;
-                    
-                    pp.rLCDC = 0;
-                    pp.rSTAT = 0;
-                    
-                    #if CONFIG_DBG
-                    _IS_DBG = 0;
-                    #endif
-                }
             }
-            else
+        }
+        else
+        {
+            FILE* f = 0;
+            #if !CONFIG_NOBOOTMEME
+            f = fopen("../testrom.gb", "rb");
+            //#error no
+            #endif
+            if(f)
             {
-                FILE* f = 0;
-                #if !CONFIG_NOBOOTMEME
-                f = fopen("../testrom.gb", "rb");
-                #error no
+                fread(&dis.WRAM[0x6000], 256, 1, f);
+                fclose(f);
+                
+                memcpy(&dis.WRAM[0x6100], &dis.ROM[0][0x100], 0x50);
+                
+                mb.micache.mc_read[0] = &dis.WRAM[0x6000]; 
+                mb.micache.mc_execute[0] = &dis.WRAM[0x6000]; 
+                //mb.micache.mc_read = &dis.WRAM[0x6000];
+                //mb.micache.mc_execute = &dis.WRAM[0x6000];
+                //mb.micache.r_read = 0;
+                //mb.micache.r_execute = 0;
+                
+                mb.PC = 0;
+                mb.DIV = 0;
+                
+                pp.rLCDC = 0;
+                pp.rSTAT = 0;
+                
+                #if CONFIG_DBG
+                _IS_DBG = 0;
                 #endif
-                if(f)
-                {
-                    fread(&dis.WRAM[0x6000], 256, 1, f);
-                    fclose(f);
-                    
-                    //memcpy(&dis.WRAM[0x6100], &dis.ROM[0x100], 0x50);
-                    
-                    //mb.micache.mc_read = &dis.WRAM[0x6000];
-                    //mb.micache.mc_execute = &dis.WRAM[0x6000];
-                    //mb.micache.r_read = 0;
-                    //mb.micache.r_execute = 0;
-                    
-                    mb.PC = 0;
-                    mb.DIV = 0;
-                    
-                    pp.rLCDC = 0;
-                    pp.rSTAT = 0;
-                    
-                    #if CONFIG_DBG
-                    _IS_DBG = 0;
-                    #endif
-                }
             }
         }
         
