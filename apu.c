@@ -27,21 +27,46 @@ static const var patterns[4] =
     0b10000001
 };
 
+#pragma region Helper functions
+
+static inline word apuchi_get_reload(const struct apu_ch_t* __restrict ch)
+{
+    return (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8)) & 0x7FF);
+}
+
+static inline wbool apuchi_is_trigger(const struct apu_ch_t* __restrict ch)
+{
+    return ch->NR_RAW[4] & 0x80;
+}
+
+static inline void apuchi_clear_trigger(struct apu_ch_t* __restrict ch)
+{
+    ch->NR_RAW[4] = ch->NR_RAW[4] & 0x7F;
+}
+
+#pragma endregion
+
 #pragma region Collapsible shit
 
 void apu_reset(apu_t* __restrict pp)
 {
-    pp->ch[0].sample_no = 0;
-    pp->ch[1].sample_no = 0;
-    pp->ch[2].sample_no = 0;
-    pp->ch[3].sample_no = 0;
+    word i;
     
-    pp->ch[0].vol = 0;
-    pp->ch[1].vol = 0;
-    pp->ch[2].vol = 0;
-    pp->ch[3].vol = 0;
+    for(i = 0; i < 4; i++)
+    {
+        pp->ch[i].vol = 0;
+        pp->ch[i].sample_no = 0;
+        
+        pp->ch[i].NR_RAW[0] = 0;
+        pp->ch[i].NR_RAW[1] = 0;
+        pp->ch[i].NR_RAW[2] = 0;
+        pp->ch[i].NR_RAW[3] = 0;
+        pp->ch[i].NR_RAW[4] = 0;
+        
+        
+    }
     
-    pp->MASTER_CFG &= 0xFF70FFFF;
+    pp->MASTER_CFG &= 0xFF700000;
     
     pp->CTR_INT = 0;
     pp->CTR_INT_FRAC = 0;
@@ -64,17 +89,17 @@ static void apu_init_ch3(apu_t* __restrict pp, word _ch)
     
     ch->length_ctr = (~ch->NR_RAW[1]) & 0xFF;
     
-    ch->reload = (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8)) & 0x7FF) >> 1; //HACK: 2MHz DAC bleh
+    ch->reload = apuchi_get_reload(ch) >> 1; //HACK: 2MHz DAC bleh
     
-    if(ch->NR_RAW[4] & 0x80)
+    if(apuchi_is_trigger(ch))
     {
-        ch->NR_RAW[4] &= ~0x80;
+        apuchi_clear_trigger(ch);
         
         pp->MASTER_CFG |= 1 << (_ch + 24);
         
         ch->vol = 1;
         ch->sweep_ctr = 0;
-        ch->ctr = ch->reload;
+        ch->ctr = 0;
         
         ch->sample_no = 1;
     }
@@ -91,12 +116,12 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
     ch->sweep_ctr = ch->NR_RAW[2] & 7;
     
     if(_ch != 3)
-        ch->reload = ~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8)) & 0x7FF;
+        ch->reload = apuchi_get_reload(ch);
     
     
-    if(ch->NR_RAW[4] & 0x80)
+    if(apuchi_is_trigger(ch))
     {
-        ch->NR_RAW[4] &= ~0x80;
+        apuchi_clear_trigger(ch);
         
         ch->vol = (ch->NR_RAW[2] >> 4) + ((ch->NR_RAW[2] >> 3) & 1);
         if(!ch->vol)
@@ -104,17 +129,12 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
         
         pp->MASTER_CFG |= 1 << (_ch + 24);
         
-        if(_ch != 3)
+        ch->ctr = 0;
+        ch->sample_no = 0;
+        
+        if(_ch == 3)
         {
-            ch->ctr = ch->reload;
             ch->sample_no = 0;
-        }
-        else // CH4
-        {
-            ch->reload = 0;
-            ch->ctr = 0;
-            ch->sample_no = 0;
-            
             ch->raw = 0;
         }
     }
@@ -140,7 +160,7 @@ void apu_write(apu_t* __restrict pp, word addr, word data)
         }
         case 1: pp->ch[0].NR_RAW[1] = data; break;
         case 2: pp->ch[0].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[0].vol = 0; break;
-        case 3: pp->ch[0].NR_RAW[3] = data; goto apu_init_ch1_lbl;
+        case 3: pp->ch[0].NR_RAW[3] = data; break;
         case 4: pp->ch[0].NR_RAW[4] = data; goto apu_init_ch1_lbl;
         apu_init_ch1_lbl:
         {
@@ -149,9 +169,9 @@ void apu_write(apu_t* __restrict pp, word addr, word data)
         }
         
         case 5: break;
-        case 6: pp->ch[1].NR_RAW[1] = data; goto apu_init_ch2_lbl;
-        case 7: pp->ch[1].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[1].vol = 0; else goto apu_init_ch2_lbl;
-        case 8: pp->ch[1].NR_RAW[3] = data; goto apu_init_ch2_lbl;
+        case 6: pp->ch[1].NR_RAW[1] = data; break;
+        case 7: pp->ch[1].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[1].vol = 0; break;
+        case 8: pp->ch[1].NR_RAW[3] = data; break;
         case 9: pp->ch[1].NR_RAW[4] = data; goto apu_init_ch2_lbl;
         apu_init_ch2_lbl:
         {
@@ -159,10 +179,10 @@ void apu_write(apu_t* __restrict pp, word addr, word data)
             break;
         }
         
-        case 10: pp->ch[2].NR_RAW[0] = data; if(!(data & 0x80)) pp->ch[2].vol = 0; else goto apu_init_ch3_lbl;
-        case 11: pp->ch[2].NR_RAW[1] = data; goto apu_init_ch3_lbl;
-        case 12: pp->ch[2].NR_RAW[2] = data; goto apu_init_ch3_lbl;
-        case 13: pp->ch[2].NR_RAW[3] = data; goto apu_init_ch3_lbl;
+        case 10: pp->ch[2].NR_RAW[0] = data; if(!(data & 0x80)) pp->ch[2].vol = 0; break;
+        case 11: pp->ch[2].NR_RAW[1] = data; break;
+        case 12: pp->ch[2].NR_RAW[2] = data; break;
+        case 13: pp->ch[2].NR_RAW[3] = data; break;;
         case 14: pp->ch[2].NR_RAW[4] = data; goto apu_init_ch3_lbl;
         apu_init_ch3_lbl:
         {
@@ -171,9 +191,9 @@ void apu_write(apu_t* __restrict pp, word addr, word data)
         }
         
         case 15: break;
-        case 16: pp->ch[3].NR_RAW[1] = data; goto apu_init_ch4_lbl;
-        case 17: pp->ch[3].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[3].vol = 0; else goto apu_init_ch4_lbl;
-        case 18: pp->ch[3].NR_RAW[3] = data; goto apu_init_ch4_lbl;
+        case 16: pp->ch[3].NR_RAW[1] = data; break;
+        case 17: pp->ch[3].NR_RAW[2] = data; if(!(data & 0xF8)) pp->ch[3].vol = 0; break;
+        case 18: pp->ch[3].NR_RAW[3] = data; break;
         case 19: pp->ch[3].NR_RAW[4] = data; goto apu_init_ch4_lbl;
         apu_init_ch4_lbl:
         {
