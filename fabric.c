@@ -74,6 +74,53 @@ PGB_FUNC const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
 
 //#include "profi.h"
 
+PGB_FUNC const r8* __restrict pgf_resolve_octant(void* userdata, word addr_oct)
+{
+    USE_UD;
+    
+    const r8* __restrict SRC = 0;
+    
+    word wb = addr_oct << 8;
+    
+    switch((addr_oct >> 4) & 0xF)
+    {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+            SRC = pgf_resolve_ROM(userdata, wb, 0);
+            break;
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+            SRC = pgf_resolve_ROM(userdata, wb, ud->mb->mi->BANK_ROM);
+            break;
+        case 8:
+        case 9:
+            SRC = &ud->mb->mi->VRAM[(ud->mb->mi->BANK_VRAM << 13) + (wb & 0x1F00)];
+            break;
+        case 12:
+        case 14:
+            SRC = &ud->mb->mi->WRAM[wb & 0xF00];
+            break;
+        case 13:
+        case 15:
+        {
+            var bank = ud->mb->mi->BANK_WRAM;
+            if(!bank)
+                bank = 1;
+            SRC = &ud->mb->mi->WRAM[(bank << 12) + (wb & 0xF00)];
+            break;
+        }
+        default:
+            SRC = 0;
+            break;
+    }
+    
+    return SRC;
+}
+
 PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
@@ -286,42 +333,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     var wb = data << 8;
                     var w;
                     r8* __restrict OAM = (r8* __restrict)(size_t)&ud->ppu->OAM[0];
-                    const r8* __restrict SRC;
-                    switch((data >> 4) & 0xF)
-                    {
-                        case 0:
-                        case 1:
-                        case 2:
-                        case 3:
-                            SRC = pgf_resolve_ROM(userdata, wb, 0);
-                            break;
-                        case 4:
-                        case 5:
-                        case 6:
-                        case 7:
-                            SRC = pgf_resolve_ROM(userdata, wb, ud->mb->mi->BANK_ROM);
-                            break;
-                        case 8:
-                        case 9:
-                            SRC = &ud->mb->mi->VRAM[(ud->mb->mi->BANK_VRAM << 13) + (wb & 0x1F00)];
-                            break;
-                        case 12:
-                        case 14:
-                            SRC = &ud->mb->mi->WRAM[wb & 0xF00];
-                            break;
-                        case 13:
-                        case 15:
-                        {
-                            var bank = ud->mb->mi->BANK_WRAM;
-                            if(!bank)
-                                bank = 1;
-                            SRC = &ud->mb->mi->WRAM[(bank << 12) + (wb & 0xF00)];
-                            break;
-                        }
-                        default:
-                            SRC = 0;
-                            break;
-                    }
+                    const r8* __restrict SRC = pgf_resolve_octant(userdata, data & 0xFF);
                     if(SRC)
                     {
                         for(w = 0; w != 160; ++w)
@@ -398,6 +410,77 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 
                 return 0xFF;
             }
+        #if CONFIG_FORCE_ENABLE_CGB
+            else if(reg == 0x51)
+            {
+                if(type)
+                    ud->GDMA_SRC = (ud->GDMA_SRC & 0x00F0) | ((data & 0xFF) << 8);
+                
+                return 0xFF;
+            }
+            else if(reg == 0x52)
+            {
+                if(type)
+                    ud->GDMA_SRC = (ud->GDMA_SRC & 0xFF00) | ((data & 0xF0) << 0);
+                
+                return 0xFF;
+            }
+            else if(reg == 0x53)
+            {
+                if(type)
+                    ud->GDMA_DST = (ud->GDMA_DST & 0x00F0) | ((data & 0x1F) << 8);
+                
+                return 0xFF;
+            }
+            else if(reg == 0x54)
+            {
+                if(type)
+                    ud->GDMA_DST = (ud->GDMA_DST & 0xFF00) | ((data & 0xF0) << 0);
+                
+                return 0xFF;
+            }
+            else if(reg == 0x55)
+            {
+                return 0xFF;
+                
+                if(type)
+                {
+                    ud->GDMA_CNT = data & 0xFF;
+                    
+                    if(ud->GDMA_CNT & 0x80)
+                    {
+                        var count = (ud->GDMA_CNT & 0x7F) + 1;
+                        
+                        while(count)
+                        {
+                            --count;
+                            const r8* __restrict SRC = pgf_resolve_octant(userdata, (ud->GDMA_SRC >> 8) & 0xFF) + (ud->GDMA_SRC & 0x00F0);
+                            
+                            if(SRC)
+                            {
+                                r8* __restrict DST = &ud->mb->mi->VRAM[(ud->mb->mi->BANK_VRAM << 13) + (ud->GDMA_DST & 0x1FF0)];
+                                
+                                var count_sub = 0x10;
+                                
+                                do
+                                    *(DST++) = *(SRC++);
+                                while(--count_sub);
+                            }
+                            
+                            ud->GDMA_DST += 0x10;
+                            ud->GDMA_SRC += 0x10;
+                        }
+                        
+                        ud->GDMA_CNT = 0;
+                    }
+                }
+                
+                if(ud->GDMA_CNT & 0x80)
+                    return ud->GDMA_CNT;
+                else
+                    return 0xFF;
+            }
+        #endif
         }
         else // undocumented CGB garbage
         {

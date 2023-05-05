@@ -21,6 +21,12 @@ struct pgf_userdata_t
     var TIMER_CNT;
     var TIMER_ACCUM;
     var TIMER_LOAD;
+    
+#if CONFIG_FORCE_ENABLE_CGB
+    var GDMA_SRC;
+    var GDMA_DST;
+    var GDMA_CNT;
+#endif
 };
 
 
