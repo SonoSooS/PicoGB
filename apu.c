@@ -31,7 +31,7 @@ static const var patterns[4] =
 
 static inline word apuchi_get_reload(const struct apu_ch_t* __restrict ch)
 {
-    return (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8)) & 0x7FF);
+    return (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8))) & 0x7FF;
 }
 
 static inline wbool apuchi_is_trigger(const struct apu_ch_t* __restrict ch)
@@ -44,9 +44,49 @@ static inline void apuchi_clear_trigger(struct apu_ch_t* __restrict ch)
     ch->NR_RAW[4] = ch->NR_RAW[4] & 0x7F;
 }
 
+static inline word apuchi_get_ch1_sample_type(struct apu_ch_t* __restrict ch)
+{
+    return (ch->NR_RAW[1] >> 6) & 3;
+}
+
+static inline word apuchi_get_ch_length(struct apu_ch_t* __restrict ch)
+{
+    return (~(ch->NR_RAW[1])) & 0x3F;
+}
+
+static inline word apuchi_get_ch3_length(struct apu_ch_t* __restrict ch)
+{
+    return (~(ch->NR_RAW[1])) & 0xFF;
+}
+
+static inline word apuchi_get_volsweep_ctr(struct apu_ch_t* __restrict ch)
+{
+    return ch->NR_RAW[2] & 7;
+}
+
+static inline wbool apuchi_get_volsweep_is_increase(struct apu_ch_t* __restrict ch)
+{
+    return (ch->NR_RAW[2] >> 3) & 1;
+}
+
+static inline word apuchi_get_volsweep_volume(struct apu_ch_t* __restrict ch)
+{
+    return (ch->NR_RAW[2] >> 4) & 0xF;
+}
+
+static inline wbool apuchi_get_dac_ch(struct apu_ch_t* __restrict ch)
+{
+    return ch->NR_RAW[2] & 0xF8;
+}
+
+static inline wbool apuchi_get_dac_ch3(struct apu_ch_t* __restrict ch)
+{
+    return ch->NR_RAW[0] & 0x80;
+}
+
 #pragma endregion
 
-#pragma region Collapsible shit
+#pragma region Collapsible misc stuff
 
 void apu_reset(apu_t* __restrict pp)
 {
@@ -87,8 +127,6 @@ static void apu_init_ch3(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    ch->length_ctr = (~ch->NR_RAW[1]) & 0xFF;
-    
     if(apuchi_is_trigger(ch))
     {
         apuchi_clear_trigger(ch);
@@ -100,6 +138,8 @@ static void apu_init_ch3(apu_t* __restrict pp, word _ch)
         ch->ctr = 0;
         
         ch->sample_no = 0;
+        
+        ch->length_ctr = apuchi_get_ch3_length(ch);
     }
 }
 
@@ -107,15 +147,11 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    ch->sample_type = ch->NR_RAW[1] >> 6;
-    ch->length_ctr = (ch->NR_RAW[1]) & 0x3F;
-    ch->sweep_ctr = ch->NR_RAW[2] & 7;
-    
     if(apuchi_is_trigger(ch))
     {
         apuchi_clear_trigger(ch);
         
-        ch->vol = (ch->NR_RAW[2] >> 4) + ((ch->NR_RAW[2] >> 3) & 1);
+        ch->vol = apuchi_get_volsweep_volume(ch) + apuchi_get_volsweep_is_increase(ch);
         if(!ch->vol)
             return;
         
@@ -129,6 +165,9 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
             ch->sample_no = 0;
             ch->raw = 0;
         }
+        
+        ch->length_ctr = apuchi_get_ch_length(ch);
+        ch->sweep_ctr = apuchi_get_volsweep_ctr(ch);
     }
 }
 
@@ -303,7 +342,7 @@ static void apuch_update_volenv(struct apu_ch_t* __restrict ch)
 {
     if(!ch->vol)
         return;
-    if(!(ch->NR_RAW[2] & 7))
+    if(!apuchi_get_volsweep_ctr(ch))
         return;
     
     if(ch->sweep_ctr)
@@ -312,9 +351,9 @@ static void apuch_update_volenv(struct apu_ch_t* __restrict ch)
         return;
     }
     
-    ch->sweep_ctr = (ch->NR_RAW[2] & 7) + 0;
+    ch->sweep_ctr = apuchi_get_volsweep_ctr(ch);
     
-    if(ch->NR_RAW[2] & 0x8)
+    if(apuchi_get_volsweep_is_increase(ch))
     {
         if(ch->vol < 0x10)
             ++(ch->vol);
@@ -340,7 +379,7 @@ static sword apuch_tick_ch1(apu_t* __restrict pp, word _ch)
         ch->sample_no = (ch->sample_no + 1) & 7;
     }
     
-    return (((patterns[ch->sample_type] >> ch->sample_no) & 1) ? -1 : 0) * ch->vol;
+    return (((patterns[apuchi_get_ch1_sample_type(ch)] >> ch->sample_no) & 1) ? -1 : 0) * ch->vol;
 }
 
 static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)

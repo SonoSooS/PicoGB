@@ -7,9 +7,9 @@
 struct apu_ch_t
 {
     r16 ctr;
-    r16 _unused;
+    r16 _unused2;
     r8 NR_RAW[5];
-    r8 sample_type;
+    r8 _unused[1];
     r8 sample_no;
     r8 sweep_ctr;
     r8 length_ctr;
