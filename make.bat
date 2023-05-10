@@ -1,0 +1,1 @@
+@gcc -o tst.exe -g -Og microcode.c mi.c ppu.c apu.c fabric.c test.c -lgdi32 -lwinmm
