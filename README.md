@@ -27,6 +27,12 @@ Extensions:
 Executable:
 - `test.c` - Windows executable, sound doesn't work in wine (causes a hang (or rather it doesn't in Hungarian 🤓))
 
+## Ports
+- Windows - see `test.c`
+- RP2040 - not publically released yet (available using VGA or SPI display output, no audio yet)
+- Playdate - not publically released yet (available using upscaling or not, audio is inaccurate)
+- Game Boy Advanced - under construction
+
 ## License
 
 PicoGB is licensed under the GNU Lesser GPL v2.1, see LICENSE.txt
