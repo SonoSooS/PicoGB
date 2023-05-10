@@ -7,10 +7,10 @@
 struct apu_ch_t
 {
     r16 ctr;
-    r16 reload;
-    r8 sample_no;
-    r8 sample_type;
+    r16 _unused;
     r8 NR_RAW[5];
+    r8 sample_type;
+    r8 sample_no;
     r8 sweep_ctr;
     r8 length_ctr;
     r8 vol;

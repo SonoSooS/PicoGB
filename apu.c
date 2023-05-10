@@ -89,8 +89,6 @@ static void apu_init_ch3(apu_t* __restrict pp, word _ch)
     
     ch->length_ctr = (~ch->NR_RAW[1]) & 0xFF;
     
-    ch->reload = apuchi_get_reload(ch) >> 1; //HACK: 2MHz DAC bleh
-    
     if(apuchi_is_trigger(ch))
     {
         apuchi_clear_trigger(ch);
@@ -101,11 +99,9 @@ static void apu_init_ch3(apu_t* __restrict pp, word _ch)
         ch->sweep_ctr = 0;
         ch->ctr = 0;
         
-        ch->sample_no = 1;
+        ch->sample_no = 0;
     }
 }
-
-#include <stdio.h>
 
 static void apu_init_ch(apu_t* __restrict pp, word _ch)
 {
@@ -114,10 +110,6 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
     ch->sample_type = ch->NR_RAW[1] >> 6;
     ch->length_ctr = (ch->NR_RAW[1]) & 0x3F;
     ch->sweep_ctr = ch->NR_RAW[2] & 7;
-    
-    if(_ch != 3)
-        ch->reload = apuchi_get_reload(ch);
-    
     
     if(apuchi_is_trigger(ch))
     {
@@ -343,7 +335,7 @@ static sword apuch_tick_ch1(apu_t* __restrict pp, word _ch)
         --(ch->ctr);
     else
     {
-        ch->ctr = ch->reload;
+        ch->ctr = apuchi_get_reload(ch);
         
         ch->sample_no = (ch->sample_no + 1) & 7;
     }
@@ -359,7 +351,7 @@ static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)
         --(ch->ctr);
     else
     {
-        ch->ctr = ch->reload;
+        ch->ctr = apuchi_get_reload(ch) >> 1;
         
         ch->sample_no = (ch->sample_no + 1) & 31;
     }
