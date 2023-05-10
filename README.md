@@ -10,6 +10,23 @@ See `pgb_main.h` for all the available functions to use.
 
 The rest of the code has no dependencies, as it's the job of the embedder to implement callback functions not implemented in `fabric.c`.
 
+## Source code layout
+
+Core:
+- `microcode.c` - actual CPU implementation, dispatches reads and writes (using a cache where possible)
+- `mi.c` - Memory Interface, currently only contains cache invalidation functions
+- `ppu.c` - Picture Processing Unit, contains all code regarding graphics, including scanline rendering, interrupts, and IO register handling
+- `apu.c` - Audio Processing Unit, contains all code regarding sound rendering, including IO register processing
+- `fabric.c` - IO register processing, and certain callback functions pre-implemented for Game Boy system
+
+Extensions:
+- `profi.c` - gcc call stack profiler, used to find and optimize away function calls where inlining makes sense
+- `lru.c` - Last Recently Used cache, used to implement fast ROM bank cache on low-RAM systems (like the RP2040 port)
+- `popcounter.h` - line drawing algorithm implemented using a shift register
+
+Executable:
+- `test.c` - Windows executable, sound doesn't work in wine (causes a hang (or rather it doesn't in Hungarian 🤓))
+
 ## License
 
 PicoGB is licensed under the GNU Lesser GPL v2.1, see LICENSE.txt
