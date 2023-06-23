@@ -877,6 +877,9 @@ int main(int argc, char** argv)
             mb.reg.HL = 0x000D;
             mb.reg.F = 0x80;
             
+            memset(&dis.WRAM[0], 0, 0x1000 * 8);
+            memset(&dis.VRAM[0], 0, 0x1000 * 4);
+            
             FILE* f = 0;
             #if !CONFIG_NOBOOTMEME
             //f = fopen("../testrom_cgb.gbc", "rb");

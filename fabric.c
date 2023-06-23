@@ -150,6 +150,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 
                 return jpsel;
             }
+            //else if(reg == 1) { if(type) putchar(data); }
             else if(reg == 4)
             {
                 if(type)
@@ -652,9 +653,11 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
                 case 0:
                     break;
                 case 1:
-                    ud->mb->mi->BANK_ROM = (data & 0x1F) & (ud->mb->mi->N_ROM - 1);
+                    ud->mb->mi->BANK_ROM = (data & 0x1F);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
                     
                     micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                     break;
@@ -674,9 +677,11 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
             {
                 if(addr & 0x100)
                 {
-                    ud->mb->mi->BANK_ROM = (data) & (ud->mb->mi->N_ROM - 1);
+                    ud->mb->mi->BANK_ROM = (data);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
                     
                     micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                 }
@@ -688,17 +693,21 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
                 case 0:
                     break;
                 case 1:
-                    ud->mb->mi->BANK_ROM = (data & 0x1F) & (ud->mb->mi->N_ROM - 1);
+                    ud->mb->mi->BANK_ROM = (data & 0x7F);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
                     
                     micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                     break;
                 case 2:
-                    assert(!"MBC3 RAM/reg sel is not supported yet");
+                    //assert(!"MBC3 RAM/reg sel is not supported yet");
+                    ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
+                    micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
                     break;
                 case 3:
-                    assert(!"MBC3 unsupported write");
+                    //assert(!"MBC3 unsupported write");
                     break;
                     
             }
@@ -710,9 +719,11 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
                 case 1:
                     break;
                 case 2:
-                    ud->mb->mi->BANK_ROM = (data & 0xFF) & (ud->mb->mi->N_ROM - 1);
+                    ud->mb->mi->BANK_ROM = (data & 0xFF);
                     if(!ud->mb->mi->BANK_ROM)
                         ud->mb->mi->BANK_ROM = 1;
+                    
+                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
                     
                     micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
                     break;
