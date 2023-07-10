@@ -628,9 +628,14 @@ PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
                     rem = UPDATE_1 - UPDATE_0;
                     ren = 1;
                 }
-                else
+                else if(pp->state.scanY != 153)
                 {
                     rem = UPDATE_3 - UPDATE_0;
+                    ren = 3;
+                }
+                else // WTF
+                {
+                    rem = 4;
                     ren = 3;
                 }
                 
@@ -651,10 +656,18 @@ PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
                 ren = 3;
                 break;
             case 3: // End of line
-                ppu_tick_internal_3(pp);
+                if(pp->state.scanY != 153)
+                {
+                    ren = 0;
+                    rem = 0;
+                }
+                else
+                {
+                    ren = 0;
+                    rem = 456 - 4; // ???
+                }
                 
-                ren = 0;
-                rem = 0;
+                ppu_tick_internal_3(pp);
                 break;
         }
         
