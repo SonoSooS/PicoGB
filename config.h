@@ -25,8 +25,9 @@
 #define CONFIG_PPU_INVERT
 #define CONFIG_APU_ENABLE
 #define CONFIG_APU_RICH
-#define CONFIG_APU_MONO
+//#define CONFIG_APU_MONO
 #define CONFIG_APU_N_PER_TICK 8
+#define CONFIG_APU_N_BUFSIZE 32768
 //#define CONFIG_ENABLE_LRU
 
 // 0 - none
@@ -181,11 +182,14 @@
 #define CONFIG_APU_RICH 1
 #endif
 
-#ifndef CONFIG_APU_MONO
+#if !defined(CONFIG_APU_MONO)
 #define CONFIG_APU_MONO 0
-#else
+#elif CONFIG_APU_MONO
 #undef CONFIG_APU_MONO
 #define CONFIG_APU_MONO 1
+#else
+#undef CONFIG_APU_MONO
+#define CONFIG_APU_MONO 0
 #endif
 
 #ifndef PPU_INTERLACE
@@ -216,4 +220,8 @@
 
 #ifndef CONFIG_APU_N_PER_TICK
 #define CONFIG_APU_N_PER_TICK 8
+#endif
+
+#ifndef CONFIG_APU_N_BUFSIZE
+#define CONFIG_APU_N_BUFSIZE 32768
 #endif

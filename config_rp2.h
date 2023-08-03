@@ -23,3 +23,8 @@
 // 5 - 8bpp ANSI 16-color (low nybble), single
 // 6 - RGB565
 #define PPU_MODE 6
+
+#define CONFIG_APU_ENABLE
+#define CONFIG_APU_MONO
+#define CONFIG_APU_N_PER_TICK 8
+#define CONFIG_APU_N_BUFSIZE 256
