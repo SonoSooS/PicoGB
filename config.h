@@ -182,14 +182,11 @@
 #define CONFIG_APU_RICH 1
 #endif
 
-#if !defined(CONFIG_APU_MONO)
+#ifndef CONFIG_APU_MONO
 #define CONFIG_APU_MONO 0
-#elif CONFIG_APU_MONO
-#undef CONFIG_APU_MONO
-#define CONFIG_APU_MONO 1
 #else
 #undef CONFIG_APU_MONO
-#define CONFIG_APU_MONO 0
+#define CONFIG_APU_MONO 1
 #endif
 
 #ifndef PPU_INTERLACE
