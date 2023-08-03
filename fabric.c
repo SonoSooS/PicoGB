@@ -624,7 +624,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
     return 0xFF;
 }
 
-static const word mappers[0x20] PGB_DATA =
+static const r8 mappers[0x20] PGB_DATA =
 {
     0, 1, 1, 1,
     0, 2, 2, 0,
