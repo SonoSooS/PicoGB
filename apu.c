@@ -454,6 +454,94 @@ static sword apuch_tick_ch4(apu_t* __restrict pp, word _ch)
     return ((ch->raw & 1) ? 1 : 0) * ch->vol;
 }
 
+typedef sword(*pAPUChCb)(apu_t* __restrict pp, word _ch);
+
+static void apu_render_add_ch(apu_t* __restrict pp, s16* outbuf, word ncounts, word ch, pAPUChCb chcb)
+{
+    word mcfg = (pp->MASTER_CFG >> 8) >> ch;
+    
+    if(!(mcfg & 5))
+        return;
+    
+    s16 sample = chcb(pp, ch);
+    r16 ctr = pp->ch[ch].ctr;
+    
+    *(outbuf++) += (mcfg & 4) ? sample : 0;
+    *(outbuf++) += (mcfg & 1) ? sample : 0;
+    --ncounts;
+    
+    while(ncounts)
+    {
+        word dowork = ctr;
+        if(ncounts < ctr)
+            dowork = ncounts;
+        
+        ctr -= dowork;
+        ncounts -= dowork;
+        pp->ch[ch].ctr = ctr;
+        
+        s16 sample_l = (mcfg & 4) ? sample : 0;
+        s16 sample_r = (mcfg & 1) ? sample : 0;
+        
+        while(dowork)
+        {
+            *(outbuf++) += sample_l;
+            *(outbuf++) += sample_r;
+            --dowork;
+        }
+        
+        if(!ncounts)
+            break;
+        
+        sample = chcb(pp, ch);
+        ctr = pp->ch[ch].ctr;
+    }
+}
+
+void apu_render_faster(apu_t* __restrict pp, s16* outbuf, word ncounts)
+{
+    word realtotal = ncounts * APU_N_PER_TICK;
+    word i, j;
+    
+    s16* buf = outbuf;
+    
+    if(!ncounts)
+        return;
+    
+    for(i = 0; i != (realtotal * 2); i++)
+        *(buf++) = 0;
+    
+    word mcfg = pp->MASTER_CFG;
+    
+    if(!((mcfg >> 8) & 0xFF))
+        return;
+    
+    apu_render_add_ch(pp, outbuf, realtotal, 0, apuch_tick_ch1);
+    apu_render_add_ch(pp, outbuf, realtotal, 1, apuch_tick_ch1);
+    apu_render_add_ch(pp, outbuf, realtotal, 2, apuch_tick_ch3);
+    apu_render_add_ch(pp, outbuf, realtotal, 3, apuch_tick_ch4);
+    
+    buf = outbuf;
+    
+    for(i = 0; i != ncounts; i++)
+    {
+        s32 out_l = 0;
+        s32 out_r = 0;
+        
+        for(j = 0; j != APU_N_PER_TICK; j++)
+        {
+            out_l += *(outbuf++);
+            out_r += *(outbuf++);
+        }
+        
+        out_r *= ((mcfg >> 0) & 7) + 1;
+        out_l *= ((mcfg >> 4) & 7) + 1;
+        
+        *(buf++) = out_l * 4;
+        *(buf++) = out_r * 4;
+    }
+}
+
 void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
 {
     var i, j;
@@ -512,10 +600,18 @@ void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
         *(outbuf++) = out_l * 4;
         *(outbuf++) = out_r * 4;
     }
+    
+    if(!(pp->ch[0].vol)) pp->MASTER_CFG &= 0xFFFEFFFF;
+    if(!(pp->ch[1].vol)) pp->MASTER_CFG &= 0xFFFDFFFF;
+    if(!(pp->ch[2].vol)) pp->MASTER_CFG &= 0xFFFBFFFF;
+    if(!(pp->ch[3].vol)) pp->MASTER_CFG &= 0xFFF7FFFF;
 }
 
 void apu_tick_internal_internals(apu_t* __restrict pp)
 {
+    if((pp->CTR_DIV & APU_DIV_256Hz))
+        return;
+    
     if(!(pp->CTR_DIV & APU_DIV_256Hz))
     {
         apuch_update_length(&pp->ch[0]);
@@ -579,7 +675,7 @@ void apu_tick_internal(apu_t* __restrict pp)
 {
     apu_tick_internal_internals(pp);
     
-    if(pp->outbuf_pos >= (sizeof(pp->outbuf)/sizeof(pp->outbuf[0])))
+    if(pp->outbuf_pos >= pp->outbuf_size)
         return;
     
     apu_render(pp, &pp->outbuf[pp->outbuf_pos], 1);

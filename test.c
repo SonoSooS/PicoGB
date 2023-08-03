@@ -686,6 +686,11 @@ int main(int argc, char** argv)
     
     var i,j;
     
+    apu.outbuf_size = 32768 * 2;
+    s16* audbuf;
+    audbuf = malloc(sizeof(*audbuf) * apu.outbuf_size);
+    apu.outbuf = audbuf;
+    
     memset((void*)&rommap[0], 0, sizeof(rommap));
     pixel_t* __restrict framebuffer = malloc(sizeof(pixel_t) * 256 * 145);
     memset(framebuffer, 0, sizeof(pixel_t) * 256 * 145);

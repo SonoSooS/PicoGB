@@ -29,7 +29,9 @@ struct apu_t
     
     r8 WVRAM[16];
     
-    s16 outbuf[2*APU_N_PER_TICK*32768];
+    s16* outbuf;
+    word outbuf_size; // must be multiple of 2
+    s16 outbuf_downsample[2 * APU_N_PER_TICK];
 };
 
 typedef struct apu_t apu_t;
@@ -42,6 +44,7 @@ word apu_read(apu_t* __restrict pp, word addr);
 void apu_write_wave(apu_t* __restrict pp, word addr, word data);
 word apu_read_wave(apu_t* __restrict pp, word addr);
 
+void apu_render_faster(apu_t* __restrict pp, s16* outbuf, word ncounts);
 void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts);
 void apu_tick_internal_internals(apu_t* __restrict pp);
 void apu_tick_internal(apu_t* __restrict pp);
