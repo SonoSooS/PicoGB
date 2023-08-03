@@ -4,6 +4,12 @@
 
 #define APU_N_PER_TICK CONFIG_APU_N_PER_TICK
 
+#if CONFIG_APU_MONO
+#define APU_N_CHANNELS 1
+#else
+#define APU_N_CHANNELS 2
+#endif
+
 struct apu_ch_t
 {
     r16 ctr;
