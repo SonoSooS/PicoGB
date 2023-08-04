@@ -37,7 +37,7 @@ struct apu_t
     
     s16* outbuf;
     word outbuf_size; // must be multiple of 2
-    s16 outbuf_downsample[2 * APU_N_PER_TICK];
+    s16 outbuf_downsample[APU_N_CHANNELS * APU_N_PER_TICK];
 };
 
 typedef struct apu_t apu_t;

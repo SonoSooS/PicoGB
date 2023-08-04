@@ -472,8 +472,18 @@ static void apu_render_add_ch(apu_t* __restrict pp, s16* outbuf, word ncounts, w
     if(!pp->ch[ch].vol)
         return;
     
+#if CONFIG_APU_MONO
+    if(1)
+    {
+        s16 sample_l = (mcfg & 4) ? sample : 0;
+        s16 sample_r = (mcfg & 1) ? sample : 0;
+        
+        *(outbuf++) += (sample_l + sample_r) >> 1;
+    }
+#else
     *(outbuf++) += (mcfg & 4) ? sample : 0;
     *(outbuf++) += (mcfg & 1) ? sample : 0;
+#endif
     --ncounts;
     
     while(ncounts)
@@ -546,18 +556,24 @@ void apu_render_faster(apu_t* __restrict pp, s16* outbuf, word ncounts)
         
         for(j = 0; j != APU_N_PER_TICK; j++)
         {
+#if CONFIG_APU_MONO
+            s32 value = *(outbuf++);
+            out_l += value;
+            out_r += value;
+#else
             out_l += *(outbuf++);
             out_r += *(outbuf++);
+#endif
         }
         
         out_r *= mul_r;
         out_l *= mul_l;
         
 #if CONFIG_APU_MONO
-        *(buf++) = (out_l * 2) + (out_r * 2);
+        *(buf++) = (out_l) + (out_r);
 #else
-        *(buf++) = out_l * 4;
-        *(buf++) = out_r * 4;
+        *(buf++) = out_l * 2;
+        *(buf++) = out_r * 2;
 #endif
     }
 }
