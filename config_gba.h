@@ -1,18 +1,13 @@
 #pragma once
 
-#define PICOGB_RP2 1
+#define PICOGB_GBA 1
 
-//#define CONFIG_DBG
-//#define CONFIG_DBG_IO
 //#define GBA
 //#define PPU_SCANLINE_UPDATES
-//#define CONFIG_DOCTOR
 //#define CONFIG_LYC_90
-//#define CONFIG_BOOTMEME
 #define CONFIG_NOBOOTMEME
 //#define CONFIG_IS_CGB
 #define CONFIG_VSYNC
-#define CONFIG_PPU_INVERT
 #define CONFIG_ENABLE_LRU
 
 // 0 - default 32bit full-color
@@ -23,9 +18,3 @@
 // 5 - 8bpp ANSI 16-color (low nybble), single
 // 6 - RGB565
 #define PPU_MODE 6
-
-// Do not enable, please save your ears!
-//#define CONFIG_APU_ENABLE
-//#define CONFIG_APU_MONO
-#define CONFIG_APU_N_PER_TICK 64
-#define CONFIG_APU_N_BUFSIZE CONFIG_APU_N_PER_TICK
