@@ -244,7 +244,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
         {
             USE_MI;
             
-            return mi->HRAM[hm];
+            return mi->HRAM[hm & 0x7F];
         }
         else
         {
@@ -266,7 +266,7 @@ PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word d
         {
             USE_MI;
             
-            mi->HRAM[hm] = data;
+            mi->HRAM[hm & 0x7F] = data;
         }
         else
         {
