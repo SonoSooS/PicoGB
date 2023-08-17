@@ -339,7 +339,9 @@ PGB_FUNC static void ppu_render_scanline(self)
     srcX >>= 3;
     srcY &= 7;
     
+#if !CONFIG_IS_CGB
     if(pp->rLCDC & 1)
+#endif
     {
         var pattern = DITHER_PATTERN | SCO_CALC;
         
@@ -527,7 +529,9 @@ PGB_FUNC static inline void ppu_tick_internal_1(self)
     var scanY = ps->scanY;
     var i, j = 0;
     
+#if !CONFIG_IS_CGB
     if(pp->rLCDC & 2)
+#endif
     {
         var tresh = scanY + 16;
         var tresl;

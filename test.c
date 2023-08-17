@@ -1067,11 +1067,11 @@ int main(int argc, char** argv)
         if(lol)
             regdump(&mb);
         
-        word repeat = 1;
-        word totalcycles = 0;
+        //word repeat = 1;
+        //word totalcycles = 0;
         word cycles;
         
-    tryagain:
+    //tryagain:
         if(!mb.HALTING || mbh_irq_get_pending(&mb))
         {
             if(mb.HALTING)
@@ -1140,7 +1140,7 @@ int main(int argc, char** argv)
             wnd_update_loop(wnd);
             break;
         }
-        
+        /*
         if(repeat)
         {
             repeat -= 1;
@@ -1152,7 +1152,7 @@ int main(int argc, char** argv)
             cycles = totalcycles >> 2;
             if(!cycles)
                 cycles = 1;
-        }
+        }*/
         
         //TODO: 17556 samples per frame
         
