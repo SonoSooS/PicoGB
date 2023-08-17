@@ -1044,6 +1044,8 @@ int main(int argc, char** argv)
     #endif
     #endif
     
+    var ppirq_tmp = 0;
+    
     for(;;)
     {
         int lol = 0;
@@ -1065,8 +1067,11 @@ int main(int argc, char** argv)
         if(lol)
             regdump(&mb);
         
+        word repeat = 1;
+        word totalcycles = 0;
         word cycles;
         
+    tryagain:
         if(!mb.HALTING || mbh_irq_get_pending(&mb))
         {
             if(mb.HALTING)
@@ -1134,6 +1139,19 @@ int main(int argc, char** argv)
             
             wnd_update_loop(wnd);
             break;
+        }
+        
+        if(repeat)
+        {
+            repeat -= 1;
+            totalcycles += cycles;
+            goto tryagain;
+        }
+        else
+        {
+            cycles = totalcycles >> 2;
+            if(!cycles)
+                cycles = 1;
         }
         
         //TODO: 17556 samples per frame
@@ -1236,11 +1254,18 @@ int main(int argc, char** argv)
         
         if(pp.rLCDC & 0x80)
         {
+            if(ppirq_tmp)
+            {
+                mb.IF |= ppirq_tmp;
+                ppirq_tmp = 0;
+            }
+            
             var ppirq = ppu_tick(&pp, cycles << 2);
             if(ppirq)
             {
                 //printf("  - IF_SCHED %02X\n", ppirq);
                 mb.IF |= ppirq;
+                ppirq_tmp |= ppirq & 0;
             }
             
             if(pp._redrawed)
