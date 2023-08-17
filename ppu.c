@@ -489,7 +489,7 @@ PGB_FUNC static void ppu_update_newline(self, word scanY)
     }
     else if(ppu_stat_set_mode(pp, 1) != 1)
     {
-        if(pp->rSTAT & (1 << 4))
+        if(pp->rSTAT & (3 << 4))
             pp->IF_SCHED |= 2;
         
         pp->IF_SCHED |= 1;
