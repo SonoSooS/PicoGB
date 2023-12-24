@@ -8,14 +8,15 @@
 
 #include <assert.h>
 
-#include "mi.h"
-#include "microcode.h"
-#include "ppu.h"
-#include "fabric.h"
+#include "../mi.h"
+#include "../microcode.h"
+#include "../ppu.h"
+#include "../fabric.h"
 
-#include "lru.h"
+#include "../lru.h"
 
 //#define DEBUGFRAME
+//#define DOUBLESPEED
 
 #ifdef DEBUGFRAME
 #define FRAME_WIDTH 256
@@ -1067,11 +1068,15 @@ int main(int argc, char** argv)
         if(lol)
             regdump(&mb);
         
-        //word repeat = 1;
-        //word totalcycles = 0;
+#ifdef DOUBLESPEED
+        word repeat = 1;
+        word totalcycles = 0;
+#endif
         word cycles;
         
-    //tryagain:
+#ifdef DOUBLESPEED
+    tryagain:
+#endif
         if(!mb.HALTING || mbh_irq_get_pending(&mb))
         {
             if(mb.HALTING)
@@ -1140,7 +1145,8 @@ int main(int argc, char** argv)
             wnd_update_loop(wnd);
             break;
         }
-        /*
+        
+#ifdef DOUBLESPEED
         if(repeat)
         {
             repeat -= 1;
@@ -1152,7 +1158,8 @@ int main(int argc, char** argv)
             cycles = totalcycles >> 2;
             if(!cycles)
                 cycles = 1;
-        }*/
+        }
+#endif
         
         //TODO: 17556 samples per frame
         
