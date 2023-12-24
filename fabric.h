@@ -29,6 +29,7 @@ struct pgf_userdata_t
     var GDMA_SRC;
     var GDMA_DST;
     var GDMA_CNT;
+    var CGB_SPEED;
 #endif
 };
 

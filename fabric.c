@@ -1,3 +1,4 @@
+
 #include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -400,7 +401,13 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else if(reg < 0x68) // misc and CGB garbage
         {
-            if(reg == 0x4F)
+            if(reg == 0x4D)
+            {
+            #if CONFIG_FORCE_ENABLE_CGB
+                
+            #endif
+            }
+            else if(reg == 0x4F)
             {
             #if CONFIG_FORCE_ENABLE_CGB
                 if(type)
@@ -513,7 +520,9 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else // undocumented CGB garbage
         {
-            if(reg == 0x68)
+            if(0) {}
+        #if CONFIG_FORCE_ENABLE_CGB
+            else if(reg == 0x68)
             {
                 if(type)
                 {
@@ -521,7 +530,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     return data;
                 }
                 
-                return ud->ppu->rBGPI;
+                return ud->ppu->rBGPI | 0x40;
             }
             else if(reg == 0x69)
             {
@@ -557,7 +566,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     return data;
                 }
                 
-                return ud->ppu->rOBPI;
+                return ud->ppu->rOBPI | 0x40;
             }
             else if(reg == 0x6B)
             {
@@ -585,6 +594,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 else
                     return ud->ppu->OBP[idx >> 1] >> 8;
             }
+        #endif
             else if(reg == 0x70)
             {
             #if CONFIG_FORCE_ENABLE_CGB
