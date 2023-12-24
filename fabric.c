@@ -150,7 +150,31 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 
                 return jpsel;
             }
-            //else if(reg == 1) { if(type) putchar(data); }
+            else if(reg == 1)
+            {
+                if(type)
+                {
+                    //putchar(data);
+                    ud->SB = data;
+                }
+                
+                return ud->SB;
+            }
+            else if(reg == 2)
+            {
+                if(type)
+                {
+                    ud->SC = data;
+                }
+                
+                return ud->SC |
+            #if CONFIG_IS_CGB
+                0x7C
+            #else
+                0x7E
+            #endif
+                ;
+            }
             else if(reg == 4)
             {
                 if(type)
