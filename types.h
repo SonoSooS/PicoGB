@@ -9,6 +9,8 @@
 #define ATTR_FORCE_INLINE
 //#define ATTR_FORCE_NOINLINE __attribute__((noinline))
 #define ATTR_FORCE_NOINLINE 
+//#define COMPILER_VARIABLE_BARRIER(var) (void)(var)
+#define COMPILER_VARIABLE_BARRIER(var) __asm volatile(""::"r"(var))
 
 
 #if PPU_IS_MONOCHROME

@@ -109,49 +109,43 @@ PGB_FUNC static inline __attribute__((optimize("O2"))) const r8* __restrict ppu_
     const r8* __restrict ret;
     var LCDC;
     var magic;
-
+    
+    // each 8px tile line is two bytes
     line <<= 1;
-    __asm volatile(""::"r"(line));
+    COMPILER_VARIABLE_BARRIER(line);
     
+    // offset VRAM by selected tile line
     ret = &pp->VRAM[line];
-    __asm volatile(""::"r"(ret));
-
-    LCDC = (pp->rLCDC + (1 << 4)) << (31 - 4) >> 31 << 8;
-    __asm volatile(""::"r"(LCDC));
+    COMPILER_VARIABLE_BARRIER(ret);
     
+    // LCDC = (LCDC & (1 << 4)) ? 0 : (1 << 8);
+    // The addition works as XOR, as only that single bit is needed
+    LCDC = (pp->rLCDC + (1 << 4)) << (31 - 4) >> 31 << 8;
+    COMPILER_VARIABLE_BARRIER(LCDC);
+    
+    // magic = idx.7 NOR LCDC.4
+    // magic = (idx & 0x80) ? 0 : (1 << 8) | garbage;
+    // Since LCDC here is only a single bit, it will clear the other garbage
     magic = (idx - (1 << 7));
     magic &= LCDC;
+    
+    // Add in real index
     magic |= idx;
     
+    // Each tile is 16bytes long, offset VRAM by real tile index
     return ret + (magic << 4);
     
-    /*
-    LCDC.4 == 0
-    idx.7 == 0 --> midx.8 = 1
-    idx.7 == 1 --> midx.8 = 0
-    
-    LCDC.4 == 1
-    midx.8 = 0
-    
-    midx.8 = (~idx & (~LCDC << 3)) << 1
-    
-    //var midx = ((((~idx & ((~(pp->rLCDC)) << 3)) & 0x80) << 1) | idx);
-    */
+    // The non-obfuscated version:
     
     /*
     if(!(pp->rLCDC & (1 << 4)))
     {
-        //var midx = (((~idx & 0x80) << 1) | idx);
         var midx;
         if(idx < 0x80)
             midx = (idx + 0x100);
         else
             midx = idx;
         return &pp->VRAM[(midx << 4) | (line << 1)];
-        
-        //0x07F 0x080  0 01111111  0 10000000
-        //0x17F 0x080  1 01111111  0 10000000
-        
     }
     else
         return &pp->VRAM[(idx << 4) | (line << 1)];
