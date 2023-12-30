@@ -104,18 +104,49 @@ PGB_FUNC void ppu_turn_off(self)
     ps->subclk = 0;
 }
 
-PGB_FUNC static inline const r8* __restrict ppu_resolve_line_tile(self, word idx, word line)
+PGB_FUNC static inline __attribute__((optimize("O2"))) const r8* __restrict ppu_resolve_line_tile(const self, word idx, word line)
 {
+    const r8* __restrict ret;
+    var LCDC;
+    var magic;
+
+    line <<= 1;
+    __asm volatile(""::"r"(line));
+    
+    ret = &pp->VRAM[line];
+    __asm volatile(""::"r"(ret));
+
+    LCDC = (pp->rLCDC + (1 << 4)) << (31 - 4) >> 31 << 8;
+    __asm volatile(""::"r"(LCDC));
+    
+    magic = (idx - (1 << 7));
+    magic &= LCDC;
+    magic |= idx;
+    
+    return ret + (magic << 4);
+    
+    /*
+    LCDC.4 == 0
+    idx.7 == 0 --> midx.8 = 1
+    idx.7 == 1 --> midx.8 = 0
+    
+    LCDC.4 == 1
+    midx.8 = 0
+    
+    midx.8 = (~idx & (~LCDC << 3)) << 1
+    
+    //var midx = ((((~idx & ((~(pp->rLCDC)) << 3)) & 0x80) << 1) | idx);
+    */
+    
+    /*
     if(!(pp->rLCDC & (1 << 4)))
     {
-        var midx = (((~idx & 0x80) << 1) | idx);
-        /*
+        //var midx = (((~idx & 0x80) << 1) | idx);
         var midx;
         if(idx < 0x80)
             midx = (idx + 0x100);
         else
             midx = idx;
-        */
         return &pp->VRAM[(midx << 4) | (line << 1)];
         
         //0x07F 0x080  0 01111111  0 10000000
@@ -124,38 +155,33 @@ PGB_FUNC static inline const r8* __restrict ppu_resolve_line_tile(self, word idx
     }
     else
         return &pp->VRAM[(idx << 4) | (line << 1)];
+    */
 }
 
-PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite(self, word idx, word line)
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite(const self, word idx, word line)
 {
     return &pp->VRAM[(idx << 4) | (line << 1)];
 }
 
 #if CONFIG_IS_CGB
-PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(self, word idx, word line)
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(const self, word idx, word line)
 {
     return &pp->VRAM[((idx << 4) | (line << 1)) | 0x2000];
 }
 #endif
 
-#if PPU_IS_DITHER
-#if CONFIG_PPU_INVERT
-static const pixel_t ditherbuf[4][4] PGB_DATA =
-{
-    {0, 0, 0, 0},
-    {1, 0, 0, 0},
-    {1, 0, 0, 1},
-    {1, 1, 1, 1},
-};
+#if PPU_MODE == 0
+#include "ppu/ppu.RGBA8.c"
+#elif PPU_MODE == 1 || PPU_MODE == 2 || PPU_MODE == 3
+#include "ppu/ppu.1bpp.c"
+#elif PPU_MODE == 4
+#include "ppu/ppu.RGBI_44.c"
+#elif PPU_MODE == 5
+#include "ppu/ppu.RGBI_8.c"
+#elif PPU_MODE == 6
+#include "ppu/ppu.RGB565.c"
 #else
-static const pixel_t ditherbuf[4][4] PGB_DATA =
-{
-    {1, 1, 1, 1},
-    {1, 0, 0, 1},
-    {1, 0, 0, 0},
-    {0, 0, 0, 0},
-};
-#endif
+#error Undefined PPU mode
 #endif
 
 #if !PPU_IS_MONOCHROME
