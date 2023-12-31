@@ -178,24 +178,6 @@ PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(const s
 #error Undefined PPU mode
 #endif
 
-#if !PPU_IS_MONOCHROME
-static const pixel_t palette[] PGB_DATA =
-#if PPU_MODE == 4 || PPU_MODE == 5
-{0xA, 0x2, 0x8, 0x0};
-#elif PPU_MODE == 6
-//{0x1084, 0x21AA, 0x3EB3, 0x5FB0};
-#define RGB565(a1, a2, a3) (((a1 >> 3) << (5 + 6)) | ((a2 >> 2) << 5) | ((a3 >> 3) << 0))
-{
-    __builtin_bswap16(RGB565(0x20, 0x20, 0x20)),
-    __builtin_bswap16(RGB565(0x47, 0x69, 0x51)),
-    __builtin_bswap16(RGB565(0x79, 0xAF, 0x98)),
-    __builtin_bswap16(RGB565(0xBD, 0xEF, 0x86))
-};
-#else
-{0x202020, 0x476951, 0x79AF98, 0xBDEF86};
-#endif
-#endif
-
 PGB_FUNC static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* __restrict tiledata, word attr)
 {
     var tl = tiledata[0];
