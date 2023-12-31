@@ -1166,7 +1166,11 @@ int main(int argc, char** argv)
         mb.DIV += cycles;
         pgf_timer_update(&userdata, cycles);
         
-        #if CONFIG_APU_ENABLE
+        #if !CONFIG_APU_ENABLE
+            #if CONFIG_APU_ENABLE_PARTIAL
+                //apu_tick(&apu, cycles, 0);
+            #endif
+        #else
         if(hwow)
         {
             apu_tick(&apu, cycles, 1);

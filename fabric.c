@@ -235,14 +235,18 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else if(reg < 0x27)
         {
-        #if CONFIG_APU_ENABLE
-            if(type)
-                apu_write(ud->apu, reg, data);
-            else
-                return apu_read(ud->apu, reg);
-        #else
-            return 0xFF;
+        #if CONFIG_APU_ENABLE_PARTIAL
+        #if !CONFIG_APU_ENABLE
+            if(ud->apu)
         #endif
+            {
+                if(type)
+                    apu_write(ud->apu, reg, data);
+                else
+                    return apu_read(ud->apu, reg);
+            }
+        #endif
+            return 0xFF;
         }
         else if(reg < 0x30)
         {
@@ -250,14 +254,18 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else if(reg < 0x40)
         {
-        #if CONFIG_APU_ENABLE
-            if(type)
-                apu_write_wave(ud->apu, reg, data);
-            else
-                return apu_read_wave(ud->apu, reg);
-        #else
-            return 0xFF;
+        #if CONFIG_APU_ENABLE_PARTIAL
+        #if !CONFIG_APU_ENABLE
+            if(ud->apu)
         #endif
+            {
+                if(type)
+                    apu_write_wave(ud->apu, reg, data);
+                else
+                    return apu_read_wave(ud->apu, reg);
+            }
+        #endif
+            return 0xFF;
         }
         else if(reg < 0x4C) // PPU
         {
