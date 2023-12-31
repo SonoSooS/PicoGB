@@ -414,7 +414,7 @@ PGB_FUNC static void ppu_render_scanline(self)
             
             var y = oamslice[0];
             var objLine = dstY + 16 - y;
-             
+            
             var tile = oamslice[2];
             var attr = oamslice[3];
             
