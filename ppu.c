@@ -513,20 +513,9 @@ PGB_FUNC void ppu_on_write_LYC(self)
     ppu_update_LYC(pp, pp->state.scanY);
 }
 
-PGB_FUNC static inline word ppu_tick_internal_0(self)
-{
-    var scanY = pp->state.scanY;
-    
-    ppu_update_newline(pp, scanY);
-    
-    return scanY < 144;
-}
-
-PGB_FUNC static inline void ppu_tick_internal_1(self)
+PGB_FUNC static inline void ppu_trigger_oam_scan(self)
 {
     USE_STATE;
-    
-    ppu_stat_set_mode(pp, 3);
     
     var scanY = ps->scanY;
     var i, j = 0;
@@ -565,14 +554,9 @@ PGB_FUNC static inline void ppu_tick_internal_1(self)
         ps->latches[j++].low = 0;
 }
 
-PGB_FUNC static inline void ppu_tick_internal_2(self)
+PGB_FUNC static inline void ppu_trigger_scanline_draw(self)
 {
     USE_STATE;
-    
-    ppu_stat_set_mode(pp, 0);
-    
-    if(pp->rSTAT & (1 << 3))
-        pp->IF_SCHED |= 2;
     
     var scanY = ps->scanY;
     
@@ -597,6 +581,42 @@ PGB_FUNC static inline void ppu_tick_internal_2(self)
     
     if((pp->rLCDC & 0x20) && (pp->rWY <= scanY) && (pp->rWX < 168) && pp->rWX)
         ++(pp->_internal_WY);
+}
+
+PGB_FUNC static inline word ppu_tick_internal_0(self)
+{
+    var scanY = pp->state.scanY;
+    
+    ppu_update_newline(pp, scanY);
+    
+#if CONFIG_PPU_ACTION_ON_START
+    ppu_trigger_oam_scan(pp);
+#endif
+    
+    return scanY < 144;
+}
+
+PGB_FUNC static inline void ppu_tick_internal_1(self)
+{
+    ppu_stat_set_mode(pp, 3);
+    
+#if !CONFIG_PPU_ACTION_ON_START
+    ppu_trigger_oam_scan(pp);
+#else
+    ppu_trigger_scanline_draw(pp);
+#endif
+}
+
+PGB_FUNC static inline void ppu_tick_internal_2(self)
+{
+    ppu_stat_set_mode(pp, 0);
+    
+    if(pp->rSTAT & (1 << 3))
+        pp->IF_SCHED |= 2;
+    
+#if !CONFIG_PPU_ACTION_ON_START
+    ppu_trigger_scanline_draw(pp);
+#endif
 }
 
 PGB_FUNC static inline void ppu_tick_internal_3(self)
