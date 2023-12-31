@@ -25,12 +25,12 @@ Extensions:
 - `popcounter.h` - line drawing algorithm implemented using a shift register
 
 Executable:
-- `test.c` - Windows executable, sound doesn't work in wine (causes a hang (or rather it doesn't in Hungarian 🤓))
+- `test/winmain.c` - Windows executable, sound doesn't work in wine (causes a hang due to unsupported sample rate)
 
 ## Ports
-- Windows - see `test.c`
-- RP2040 - not publically released yet (available using VGA or SPI display output, no audio yet)
-- Playdate - not publically released yet (available using upscaling or not, audio is inaccurate)
+- Windows - see `test/winmain.c`
+- RP2040 - not publically released yet (available using VGA or SPI display output, broken audio)
+- Playdate - not publically released yet (available using upscaling or not, audio is inaccurate and crashes sometimes)
 - Game Boy Advanced - under construction
 
 ## License
