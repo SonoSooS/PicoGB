@@ -336,6 +336,8 @@ PGB_FUNC static void ppu_render_scanline(self)
     
     pixel_t* __restrict scanline = ps->framebuffer[dstY];
     
+    const var window_enable = (pp->rLCDC & 0x20) && (pp->rWY <= dstY) && (pp->rWX < RENDER_WIDTH);
+    
     var i;
     
     srcX >>= 3;
@@ -347,7 +349,13 @@ PGB_FUNC static void ppu_render_scanline(self)
     {
         var pattern = DITHER_PATTERN | SCO_CALC;
         
-        for(i = 0; i != (RENDER_WIDTH / 8); ++i)
+        var maxsize;
+        if(!window_enable)
+            maxsize = ((RENDER_WIDTH + 7) >> 3);
+        else
+            maxsize = (pp->rWX + 7) >> 3;
+        
+        for(i = 0; i < maxsize; ++i)
         {
             var idx = r_line_idx[srcX];
             var attr = IS_CGB ? r_line_idx[srcX + 0x2000] : 0;
@@ -366,7 +374,7 @@ PGB_FUNC static void ppu_render_scanline(self)
         }
     }
     
-    if((pp->rLCDC & 0x20) && (pp->rWY <= dstY) && (pp->rWX < RENDER_WIDTH) && pp->rWX)
+    if(window_enable)
     //if(0)
     {
         srcY = pp->_internal_WY;
