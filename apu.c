@@ -180,6 +180,13 @@ void apu_write(apu_t* __restrict pp, word addr, word data)
     //if(addr >= (2 * 5) && addr < (3 * 5))
     //printf("NR%u%u = %02X\n", (addr / 5) + 1, addr % 5, data);
     
+    if(addr >= 22)
+        ;
+    else if((pp->MASTER_CFG & (1 << 23)))
+        ;
+    else
+        return;
+    
     switch(addr)
     {
         case 0: pp->ch[0].NR_RAW[0] = data;
