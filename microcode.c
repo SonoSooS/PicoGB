@@ -249,7 +249,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     {
         var hm = addr & 0xFF;
         
-        if(hm != 0xFF)
+        if LIKELY(hm != 0xFF)
         {
             USE_MI;
             
@@ -262,7 +262,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     }
     
     // Handle IO by fabric
-    return pgf_cb_IO_(mb->mi->userdata, addr, 0, 0);
+    return mb->mi->dispatch_IO(mb->mi->userdata, addr, 0, 0);
 }
 
 PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
@@ -271,7 +271,7 @@ PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word d
     {
         var hm = addr & 0xFF;
         
-        if(hm != 0xFF)
+        if LIKELY(hm != 0xFF)
         {
             USE_MI;
             

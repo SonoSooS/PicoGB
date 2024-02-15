@@ -12,7 +12,12 @@
 
 PGB_FUNC const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
 {
+    #if CONFIG_ENABLE_LRU
     return pgf_resolve_ROM_internal(userdata, addr, bank);
+    #else
+    USE_UD;
+    return ud->mb->mi->ROMBASE + 0x4000 * bank + (addr & 0x3FFF);
+    #endif
 }
 
 //#include "profi.h"
