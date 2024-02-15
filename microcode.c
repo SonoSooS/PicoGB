@@ -57,13 +57,21 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
         {
             if(r_addr < MICACHE_R_VALUE(0x4000))
             {
-                ret = mi->ROMBASE;
+                #if CONFIG_ENABLE_LRU
+                    ret = mi->ROM[0];
+                #else
+                    ret = mi->ROMBASE;
+                #endif
                 if(ret)
                     return &ret[r_addr << MICACHE_R_BITS];
             }
             else
             {
-                ret = mi->ROMBASE + 0x4000 * mi->BANK_ROM;
+                #if CONFIG_ENABLE_LRU
+                    ret = mi->ROM[mi->BANK_ROM];
+                #else
+                    ret = mi->ROMBASE + 0x4000 * mi->BANK_ROM;
+                #endif
                 if(ret)
                 {
                     r_addr &= MICACHE_R_VALUE(0x3FFF);
@@ -440,8 +448,13 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
             USE_MI;
             
             const r8* __restrict rom = (addr < 0x4000)
+            #if CONFIG_ENABLE_LRU
+                ? mi->ROM[0]
+                : mi->ROM[mi->BANK_ROM];
+            #else
                 ? mi->ROMBASE
                 : (mi->ROMBASE + 0x4000 * mi->BANK_ROM);
+            #endif
             res = rom[addr & 0x3FFF];
         }
         else
@@ -1020,7 +1033,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                                 if ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F)))
                                     return 0; // wedge until NMI
                                     
-                                // XXX optimization hack
+                                // XXX optimization hack -- 1 fps gain on cv2
                                 ncycles += 20;
                             }
                             
