@@ -53,7 +53,8 @@ static inline void pgf_timer_update(struct pgf_userdata_t* __restrict ud, word c
     if UNLIKELY(ud->TIMER_ACCUM >= 0x10000)
     {
         ud->mb->IF |= 4;
-        ud->TIMER_ACCUM = ud->TIMER_LOAD;
+        word remainder = 0x10000 - ud->TIMER_LOAD;
+        ud->TIMER_ACCUM = ud->TIMER_LOAD + ((ud->TIMER_INC * cycles) % remainder);
     }
 }
 
