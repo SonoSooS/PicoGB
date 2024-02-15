@@ -17,9 +17,10 @@ struct pgf_userdata_t
     var JOYP_RAW; // A is $01, Right is $10
     var JOYP;
     
+    var TIMER_ACCUM; // bits 8-15 contain visible timer
+    var TIMER_INC; // how much to increment timer
     var TIMER_SUB;
     var TIMER_CNT;
-    var TIMER_ACCUM;
     var TIMER_LOAD;
     
     var SB;
@@ -46,12 +47,14 @@ PGB_FUNC r32 pgf_cb_BOOTROM(void* userdata, r32 addr, r32 data, word type);
 const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank);
 #endif
 
-static inline void pgf_timer_update(struct pgf_userdata_t* __restrict ud, word ticks)
+static inline void pgf_timer_update(struct pgf_userdata_t* __restrict ud, word cycles)
 {
-    if(!(ud->TIMER_CNT & 4))
-        return;
-    
-    pgf_timer_update_internal(ud, ticks);
+    ud->TIMER_ACCUM += ud->TIMER_INC * cycles;
+    if UNLIKELY(ud->TIMER_ACCUM >= 0x10000)
+    {
+        ud->mb->IF |= 4;
+        ud->TIMER_ACCUM = ud->TIMER_LOAD;
+    }
 }
 
 static inline const r8* pgf_resolve_ROM_internal(void* userdata, word addr, word bank)

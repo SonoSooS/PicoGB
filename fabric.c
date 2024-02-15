@@ -10,64 +10,6 @@
 #include "lru.h"
 #endif
 
-
-PGB_FUNC void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
-{
-    //if(!(ud->TIMER_CNT & 4))
-    //    return;
-    
-    var nres = ticks + ud->TIMER_SUB;
-    // 0, 4, 16, 64
-    
-    var ncnt = 1 << ((ud->TIMER_CNT & 3) << 1);
-    if(ncnt & 1)
-        ncnt <<= 8;
-    
-    /*
-    var ncnt;
-    switch(ud->TIMER_CNT & 3)
-    {
-        case 0:
-            ncnt = 256;
-            break;
-        case 1:
-            ncnt = 4;
-            break;
-        case 2:
-            ncnt = 16;
-            break;
-        case 3:
-            ncnt = 64;
-            break; 
-        
-        default:
-            __builtin_unreachable();
-    }
-    */
-    
-    
-    if(nres >= ncnt)
-    {
-        var tv = ud->TIMER_ACCUM;
-        
-        do
-        {
-            if((++tv) >> 8)
-            {
-                tv = ud->TIMER_LOAD;
-                ud->mb->IF |= 4;
-            }
-            
-            nres -= ncnt;
-        }
-        while(nres >= ncnt);
-        
-        ud->TIMER_ACCUM = tv;
-    }
-    
-    ud->TIMER_SUB = nres;
-}
-
 PGB_FUNC const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
 {
     return pgf_resolve_ROM_internal(userdata, addr, bank);
@@ -193,30 +135,39 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             {
                 if(type)
                 {
-                    ud->TIMER_ACCUM = data;
+                    ud->TIMER_ACCUM = data << 8;
                     return data;
                 }
                 
-                return ud->TIMER_ACCUM;
+                return ud->TIMER_ACCUM >> 8;
             }
             else if(reg == 6)
             {
                 if(type)
                 {
-                    ud->TIMER_LOAD = data;
+                    ud->TIMER_LOAD = data << 8;
                     return data;
                 }
                 
-                return ud->TIMER_LOAD;
+                return ud->TIMER_LOAD >> 8;
             }
             else if(reg == 7)
             {
                 if(type)
                 {
                     if(!(ud->TIMER_CNT & 4))
+                    {
                         ud->TIMER_SUB = -2;
+                    }
                     //ud->TIMER_ACCUM = ud->TIMER_LOAD;
                     ud->TIMER_CNT = data & 7;
+                    
+                    const static uint8_t TIMER_INC_RATE[] = {
+                        0,   0,  0,  0, 
+                        1,  64, 16,  4
+                    };
+                    
+                    ud->TIMER_INC = TIMER_INC_RATE[data & 7];
                     return data;
                 }
                 

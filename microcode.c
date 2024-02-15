@@ -2,6 +2,7 @@
 
 #include "microcode.h"
 #include "dbg.h"
+#include "fabric.h"
 
 
 #define self mb_state* __restrict mb
@@ -253,7 +254,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     }
     
     // Handle IO by fabric
-    return mb->mi->dispatch_IO(mb->mi->userdata, addr, 0, 0);
+    return pgf_cb_IO_(mb->mi->userdata, addr, 0, 0);
 }
 
 PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
@@ -301,7 +302,7 @@ PGB_FUNC ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
         return *ptr;
     }
     
-    if(addr < 0xFE00)
+    if UNLIKELY(addr < 0xFE00)
     {
         addr -= 0x2000;
         goto wram_read;
@@ -1315,7 +1316,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             return 0;
         
         case 1: // MOV
-            if(IR != 0x76)
+            if LIKELY(IR != 0x76)
             {
                 instr_MOV:
                 {
