@@ -21,7 +21,7 @@ static inline word pgb_main_tick(mb_state* __restrict mb, vbool* ticked)
     else if(mb->HALTING)
     {
         if(!mb->IR.high)
-            mb->IR.high = 1
+            mb->IR.high = 1;
         
         if(ticked)
             *ticked = 0;
