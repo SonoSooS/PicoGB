@@ -43,6 +43,7 @@ struct mb_mi_cache
 struct mi_dispatch
 {
     const r8* __restrict const * __restrict ROM;
+    const r8* __restrict ROMBASE;
     r8* __restrict WRAM;
     r8* __restrict VRAM;
     r8* __restrict SRAM;

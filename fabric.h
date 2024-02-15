@@ -71,7 +71,7 @@ static inline const r8* pgf_resolve_ROM_internal(void* userdata, word addr, word
     if(ud->mb->mi->ROM)
 #endif
     {
-        res = ud->mb->mi->ROM[bank];
+        res = ud->mb->mi->ROMBASE + 0x4000 * bank;
         if(res)
             return &res[addr & 0x3FFF];
     }

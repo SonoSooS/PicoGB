@@ -57,13 +57,13 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
         {
             if(r_addr < MICACHE_R_VALUE(0x4000))
             {
-                ret = mi->ROM[0];
+                ret = mi->ROMBASE;
                 if(ret)
                     return &ret[r_addr << MICACHE_R_BITS];
             }
             else
             {
-                ret = mi->ROM[mi->BANK_ROM];
+                ret = mi->ROMBASE + 0x4000 * mi->BANK_ROM;
                 if(ret)
                 {
                     r_addr &= MICACHE_R_VALUE(0x3FFF);
@@ -440,8 +440,8 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
             USE_MI;
             
             const r8* __restrict rom = (addr < 0x4000)
-                ? mi->ROM[0]
-                : mi->ROM[mi->BANK_ROM];
+                ? mi->ROMBASE
+                : (mi->ROMBASE + 0x4000 * mi->BANK_ROM);
             res = rom[addr & 0x3FFF];
         }
         else
@@ -1010,18 +1010,24 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         case 3: // JR e8
                         generic_jr:
                         {
-                            var PC = mb->PC;
                             data_wide = mch_memory_fetch_PC(mb);
+                            var PC = mb->PC;
                             
                             // Wedge if unbreakable spinloop is detected
                             // TODO: unfuck this statement
-                            if(data_wide == 0xFE && ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F))))
-                                return 0; // wedge until NMI
+                            if(data_wide == 0xFE)
+                            {
+                                if ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F)))
+                                    return 0; // wedge until NMI
+                                    
+                                // XXX optimization hack
+                                ncycles += 20;
+                            }
                             
                             if(data_wide >= 0x80)
                                 data_wide |= 0xFF00;
                             
-                            mb->PC = (data_wide + PC + 1) & 0xFFFF;
+                            mb->PC = (data_wide + PC) & 0xFFFF;
                             
                             ncycles += 2; // parallel add + fetch
                             goto generic_fetch;
