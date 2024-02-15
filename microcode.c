@@ -367,7 +367,7 @@ PGB_FUNC ATTR_HOT static inline word mch_memory_fetch_decode_1(self, word addr)
         return *ptr;
     }
     
-    if(addr < 0xFE00)
+    if UNLIKELY(addr < 0xFE00)
     {
         addr -= 0x2000;
         goto wram_read;
@@ -427,10 +427,30 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
 // Fetch one byte from PC, incrementing it as well
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 {
+    var res;
     word addr = mb->PC;
-    mb->PC = (addr + 1) & 0xFFFF;
+    mb->PC = (addr + 1);
     
-    var res = mch_memory_fetch_decode_1(mb, addr);
+    #if CONFIG_ENABLE_LRU
+        mb->PC &= 0xFFFF;
+        res = mch_memory_fetch_decode_1(mb, addr);
+    #else
+        if LIKELY(addr < 0x8000)
+        {
+            USE_MI;
+            
+            const r8* __restrict rom = (addr < 0x4000)
+                ? mi->ROM[0]
+                : mi->ROM[mi->BANK_ROM];
+            res = rom[addr & 0x3FFF];
+        }
+        else
+        {
+            mb->PC &= 0xFFFF;
+            res = mch_memory_fetch_decode_1(mb, addr);
+        }
+    #endif
+    
     DBGF("- /M1 %04X <> %02X\n", addr, res);
     return res;
 }
