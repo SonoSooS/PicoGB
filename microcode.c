@@ -448,13 +448,8 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
             USE_MI;
             
             const r8* __restrict rom = (addr < 0x4000)
-            #if CONFIG_ENABLE_LRU
-                ? mi->ROM[0]
-                : mi->ROM[mi->BANK_ROM];
-            #else
                 ? mi->ROMBASE
                 : (mi->ROMBASE + 0x4000 * mi->BANK_ROM);
-            #endif
             res = rom[addr & 0x3FFF];
         }
         else
@@ -472,11 +467,24 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_2(self)
 {
     word addr = mb->PC;
-    mb->PC = (addr + 2) & 0xFFFF;
+    mb->PC += 2;
     
-    word resp = mch_memory_fetch_decode_2(mb, addr);
-    DBGF("- /M2 %04X <> %04X\n", addr, resp);
-    return resp;
+    if (addr < 0x8000 && (addr % 0x4000 != 0x3FFF) && !CONFIG_ENABLE_LRU)
+    {
+        USE_MI;
+        const r8* __restrict rom = (addr < 0x4000)
+            ? mi->ROMBASE
+            : (mi->ROMBASE + 0x4000 * mi->BANK_ROM);
+        return *(r16*)&rom[addr % 0x4000];
+    }
+    else
+    {
+        mb->PC &= 0xFFFF;
+        
+        word resp = mch_memory_fetch_decode_2(mb, addr);
+        DBGF("- /M2 %04X <> %04X\n", addr, resp);
+        return resp;
+    }
 }
 
 #pragma endregion
