@@ -12,6 +12,19 @@
 //#define COMPILER_VARIABLE_BARRIER(var) (void)(var)
 #define COMPILER_VARIABLE_BARRIER(var) __asm volatile(""::"r"(var))
 
+#if defined(__GNUC__) || defined(__clang__)
+    #define LIKELY(x)   (__builtin_expect(!!(x), 1))
+    #define UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#else
+    #define LIKELY(x)   (x)
+    #define UNLIKELY(x) (x)
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+    #define LIKELY_P(x, p)   (__builtin_expect_with_probability(!!(x), 1, p))
+#else
+    #define LIKELY_P(x, p)   (x)
+#endif
 
 #if PPU_IS_MONOCHROME
 typedef unsigned char pixel_t;

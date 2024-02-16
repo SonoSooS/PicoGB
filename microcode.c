@@ -2,6 +2,7 @@
 
 #include "microcode.h"
 #include "dbg.h"
+#include "fabric.h"
 
 
 #define self mb_state* __restrict mb
@@ -56,13 +57,21 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
         {
             if(r_addr < MICACHE_R_VALUE(0x4000))
             {
-                ret = mi->ROM[0];
+                #if CONFIG_ENABLE_LRU
+                    ret = mi->ROM[0];
+                #else
+                    ret = mi->ROMBASE;
+                #endif
                 if(ret)
                     return &ret[r_addr << MICACHE_R_BITS];
             }
             else
             {
-                ret = mi->ROM[mi->BANK_ROM];
+                #if CONFIG_ENABLE_LRU
+                    ret = mi->ROM[mi->BANK_ROM];
+                #else
+                    ret = mi->ROMBASE + 0x4000 * mi->BANK_ROM;
+                #endif
                 if(ret)
                 {
                     r_addr &= MICACHE_R_VALUE(0x3FFF);
@@ -240,7 +249,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     {
         var hm = addr & 0xFF;
         
-        if(hm != 0xFF)
+        if LIKELY(hm != 0xFF)
         {
             USE_MI;
             
@@ -262,7 +271,7 @@ PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word d
     {
         var hm = addr & 0xFF;
         
-        if(hm != 0xFF)
+        if LIKELY(hm != 0xFF)
         {
             USE_MI;
             
@@ -301,7 +310,7 @@ PGB_FUNC ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
         return *ptr;
     }
     
-    if(addr < 0xFE00)
+    if UNLIKELY(addr < 0xFE00)
     {
         addr -= 0x2000;
         goto wram_read;
@@ -366,7 +375,7 @@ PGB_FUNC ATTR_HOT static inline word mch_memory_fetch_decode_1(self, word addr)
         return *ptr;
     }
     
-    if(addr < 0xFE00)
+    if UNLIKELY(addr < 0xFE00)
     {
         addr -= 0x2000;
         goto wram_read;
@@ -426,10 +435,30 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
 // Fetch one byte from PC, incrementing it as well
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 {
+    var res;
     word addr = mb->PC;
-    mb->PC = (addr + 1) & 0xFFFF;
+    mb->PC = (addr + 1);
     
-    var res = mch_memory_fetch_decode_1(mb, addr);
+    #if CONFIG_ENABLE_LRU
+        mb->PC &= 0xFFFF;
+        res = mch_memory_fetch_decode_1(mb, addr);
+    #else
+        if LIKELY(addr < 0x8000)
+        {
+            USE_MI;
+            
+            const r8* __restrict rom = (addr < 0x4000)
+                ? mi->ROMBASE
+                : (mi->ROMBASE + 0x4000 * mi->BANK_ROM);
+            res = rom[addr & 0x3FFF];
+        }
+        else
+        {
+            mb->PC &= 0xFFFF;
+            res = mch_memory_fetch_decode_1(mb, addr);
+        }
+    #endif
+    
     DBGF("- /M1 %04X <> %02X\n", addr, res);
     return res;
 }
@@ -438,11 +467,24 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
 PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_2(self)
 {
     word addr = mb->PC;
-    mb->PC = (addr + 2) & 0xFFFF;
+    mb->PC += 2;
     
-    word resp = mch_memory_fetch_decode_2(mb, addr);
-    DBGF("- /M2 %04X <> %04X\n", addr, resp);
-    return resp;
+    if (addr < 0x8000 && (addr % 0x4000 != 0x3FFF) && !CONFIG_ENABLE_LRU)
+    {
+        USE_MI;
+        const r8* __restrict rom = (addr < 0x4000)
+            ? mi->ROMBASE
+            : (mi->ROMBASE + 0x4000 * mi->BANK_ROM);
+        return *(r16*)&rom[addr % 0x4000];
+    }
+    else
+    {
+        mb->PC &= 0xFFFF;
+        
+        word resp = mch_memory_fetch_decode_2(mb, addr);
+        DBGF("- /M2 %04X <> %04X\n", addr, resp);
+        return resp;
+    }
 }
 
 #pragma endregion
@@ -989,18 +1031,24 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         case 3: // JR e8
                         generic_jr:
                         {
-                            var PC = mb->PC;
                             data_wide = mch_memory_fetch_PC(mb);
+                            var PC = mb->PC;
                             
                             // Wedge if unbreakable spinloop is detected
                             // TODO: unfuck this statement
-                            if(data_wide == 0xFE && ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F))))
-                                return 0; // wedge until NMI
+                            if(data_wide == 0xFE)
+                            {
+                                if ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F)))
+                                    return 0; // wedge until NMI
+                                    
+                                // XXX optimization hack -- 1 fps gain on cv2
+                                ncycles += 20;
+                            }
                             
                             if(data_wide >= 0x80)
                                 data_wide |= 0xFF00;
                             
-                            mb->PC = (data_wide + PC + 1) & 0xFFFF;
+                            mb->PC = (data_wide + PC) & 0xFFFF;
                             
                             ncycles += 2; // parallel add + fetch
                             goto generic_fetch;
@@ -1315,7 +1363,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             return 0;
         
         case 1: // MOV
-            if(IR != 0x76)
+            if LIKELY(IR != 0x76)
             {
                 instr_MOV:
                 {
