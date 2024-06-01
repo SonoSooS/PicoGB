@@ -59,5 +59,5 @@ void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word start, wo
 
 PGB_FUNC static inline word mbh_irq_get_pending(const mb_state* __restrict mb)
 {
-    return mb->IE & mb->IF & 0x1F;
+    return mb->IE & mb->IF;
 }
