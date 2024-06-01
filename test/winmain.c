@@ -414,12 +414,12 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
                 SRCCOPY
             );
             
-            /*
+#if 0
             WCHAR fmtbuf[128];
             TextOutW(dc, 0, 0, fmtbuf, swprintf(fmtbuf, sizeof(fmtbuf) / sizeof(fmtbuf[0]), L"STAT=%02X LYC=%02X LY=%02X LCDC=%02X", ud->ppu->rSTAT, ud->ppu->rLYC, ud->ppu->state.scanY, ud->ppu->rLCDC));
-            */
+#endif
             
-            /*
+#if 0
             HFONT hFont = (HFONT)GetStockObject(SYSTEM_FIXED_FONT);
             HFONT hOldFont = (HFONT)SelectObject(dc, hFont);
             
@@ -459,7 +459,7 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             }
             
             SelectObject(dc, hOldFont);
-            */
+#endif
             
             EndPaint(wnd, &pstr);
             
