@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+#include <windows.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -368,8 +368,8 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             
             #if PPU_IS_MONOCHROME
             bmi->biBitCount = 1;
-            palette[0] = (RGBQUAD){0xAB, 0xB3, 0xB6, 0x00};
-            palette[1] = (RGBQUAD){0x26, 0x26, 0x25, 0x00};
+            palette[0] = (RGBQUAD){0x26, 0x26, 0x25, 0x00};
+            palette[1] = (RGBQUAD){0xAB, 0xB3, 0xB6, 0x00};
             
             bmi->biClrUsed = 2;
             bmi->biClrImportant = bmi->biClrUsed;
