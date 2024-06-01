@@ -19,7 +19,7 @@ void apu_initialize(apu_t* __restrict pp);
 #define APU_BIAS 8
 
 
-static const var patterns[4] =
+static const var patterns[4] PGB_DATA =
 {
     0b11111110,
     0b01111110,
@@ -303,7 +303,7 @@ word apu_read_internal(apu_t* __restrict pp, word addr)
     }
 }
 
-static const r8 APU_BITS[23] =
+static const r8 APU_BITS[23] PGB_DATA =
 {
     0x80, 0x3F, 0x00, 0xFF, 0xBF,
     0xFF, 0x3F, 0x00, 0xFF, 0xBF,
@@ -419,7 +419,7 @@ static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)
     }
 }
 
-static const r8 APUCH_CH4_MULDIV[8] =
+static const r8 APUCH_CH4_MULDIV[8] PGB_DATA =
 {
     1, 2, 4, 6, 8, 10, 12, 14
 };
