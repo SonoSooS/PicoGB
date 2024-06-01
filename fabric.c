@@ -459,7 +459,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             else if(reg == 0x53)
             {
                 if(type)
-                    ud->GDMA_DST = (ud->GDMA_DST & 0x00F0) | ((data & 0x1F) << 8);
+                    ud->GDMA_DST = (ud->GDMA_DST & 0x00F0) | ((data & 0xFF) << 8);
                 
                 return 0xFF;
             }
@@ -479,14 +479,13 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     {
                         var count = (ud->GDMA_CNT & 0x7F) + 1;
                         
-                        while(count)
+                        do
                         {
-                            --count;
                             const r8* __restrict SRC = pgf_resolve_octant(userdata, (ud->GDMA_SRC >> 8) & 0xFF);
                             
                             if(SRC)
                             {
-                                SRC += (ud->GDMA_SRC & 0x00F0);
+                                SRC += (ud->GDMA_SRC & 0xF0);
                                 
                                 r8* __restrict DST = &ud->mb->mi->VRAM[(ud->mb->mi->BANK_VRAM << 13) + (ud->GDMA_DST & 0x1FF0)];
                                 
@@ -500,6 +499,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                             ud->GDMA_DST += 0x10;
                             ud->GDMA_SRC += 0x10;
                         }
+                        while(--count);
                         
                         ud->GDMA_CNT = 0;
                     }
