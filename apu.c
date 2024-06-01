@@ -295,6 +295,11 @@ word apu_read_internal(apu_t* __restrict pp, word addr)
             return (pp->MASTER_CFG >> 8) & 0xFF;
         
         case 22:
+            if(!(pp->ch[0].vol)) pp->MASTER_CFG &= 0xFFFEFFFF;
+            if(!(pp->ch[1].vol)) pp->MASTER_CFG &= 0xFFFDFFFF;
+            if(!(pp->ch[2].vol)) pp->MASTER_CFG &= 0xFFFBFFFF;
+            if(!(pp->ch[3].vol)) pp->MASTER_CFG &= 0xFFF7FFFF;
+            
             return ((pp->MASTER_CFG >> 16) & 0x8F) | 0x70;
         
         default:
@@ -711,11 +716,6 @@ void apu_tick_internal_internals(apu_t* __restrict pp)
             apu_init_ch(pp, 0);
         }
     }
-    
-    if(!(pp->ch[0].vol)) pp->MASTER_CFG &= 0xFFFEFFFF;
-    if(!(pp->ch[1].vol)) pp->MASTER_CFG &= 0xFFFDFFFF;
-    if(!(pp->ch[2].vol)) pp->MASTER_CFG &= 0xFFFBFFFF;
-    if(!(pp->ch[3].vol)) pp->MASTER_CFG &= 0xFFF7FFFF;
 }
 
 void apu_tick_internal(apu_t* __restrict pp)
