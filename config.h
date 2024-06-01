@@ -3,39 +3,34 @@
 //#define PICOGB_RP2 1
 //#define PICOGB_PD 1
 
-#if defined(PICOGB_PD) || (defined(TARGET_SIMULATOR) && TARGET_SIMULATOR)
+#if defined(PICOGB_CUSTOM) && (PICOGB_CUSTOM)
+// do not the config
+#include "pgb_config.h"
+#elif defined(PICOGB_PD) || (defined(TARGET_SIMULATOR) && TARGET_SIMULATOR)
 #define NO_ASSERT
 #include "config_pd.h"
 #elif defined(PICO_NO_FPGA_CHECK) || defined(PICOGB_RP2)
 #include "config_rp2.h"
 #else
+#warning "Do not fall back on default config! Define PICOGB_CUSTOM as 1, and copypaste this config to pgb_config.h instead."
+
 //#define CONFIG_DBG
 //#define CONFIG_DBG_IO
 //#define GBA
 //#define PPU_SCANLINE_UPDATES
-//#define CONFIG_MIC_CACHE_BYPASS
-//#define CONFIG_DOCTOR
-//#define CONFIG_LYC_90
-//#define CONFIG_BOOTMEME
 #define CONFIG_NOBOOTMEME
 //#define CONFIG_IS_CGB
 //#define CONFIG_FORCE_ENABLE_CGB
 //#define CONFIG_PPU_CGB_MONO
-#define CONFIG_VSYNC 2
 #define CONFIG_PPU_INVERT
 #define CONFIG_APU_ENABLE_PARTIAL
-//#define CONFIG_APU_ENABLE
+#define CONFIG_APU_ENABLE
 #define CONFIG_APU_RICH
 //#define CONFIG_APU_MONO
 #define CONFIG_APU_N_PER_TICK 8
 #define CONFIG_APU_N_BUFSIZE 32768
-//#define CONFIG_ENABLE_LRU
 //#define CONFIG_PPU_ACTION_ON_START
 
-// 0 - none
-// 1 - record
-// 2 - playback
-#define CONFIG_TAS 0
 
 // 0 - default 32bit full-color
 // 1 - 1bpp jankdither globally fixed
@@ -52,6 +47,10 @@
 #define PPU_INTERLACE 0
 
 #endif
+
+
+// ========[DO NOT CHANGE PAST THIS]========
+
 
 #ifdef NO_ASSERT
 #undef assert
