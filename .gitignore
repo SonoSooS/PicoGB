@@ -1,4 +1,5 @@
 *.txt
+*.log
 !LICENSE.txt
 *.bin
 *.py
