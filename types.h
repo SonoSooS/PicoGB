@@ -11,6 +11,12 @@
 #define ATTR_FORCE_NOINLINE 
 //#define COMPILER_VARIABLE_BARRIER(var) (void)(var)
 #define COMPILER_VARIABLE_BARRIER(var) __asm volatile(""::"r"(var))
+//#define COMPILER_MEMORY_BARRIER() 
+#define COMPILER_MEMORY_BARRIER() __asm volatile("":::"memory")
+//#define COMPILER_UNLIKELY(cond) cond
+#define COMPILER_UNLIKELY(cond) __builtin_expect(cond, 0)
+//#define COMPILER_LIKELY(cond) cond
+#define COMPILER_LIKELY(cond) __builtin_expect(cond, 1)
 
 
 #if PPU_IS_MONOCHROME

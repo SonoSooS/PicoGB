@@ -11,61 +11,51 @@
 #endif
 
 
-PGB_FUNC void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
+PGB_FUNC __attribute__((optimize("O2"))) void pgf_timer_update_internal(struct pgf_userdata_t* __restrict ud, word ticks)
 {
-    //if(!(ud->TIMER_CNT & 4))
-    //    return;
+    var divider_sel = ((ud->TIMER_CNT + 3) & 3) << 1;
+    var step_period = 4 << divider_sel;
+    COMPILER_VARIABLE_BARRIER(step_period);
     
-    var nres = ticks + ud->TIMER_SUB;
-    // 0, 4, 16, 64
+    var cycles_left = ticks + ud->TIMER_SUB;
+    COMPILER_VARIABLE_BARRIER(cycles_left);
     
-    var ncnt = 1 << ((ud->TIMER_CNT & 3) << 1);
-    if(ncnt & 1)
-        ncnt <<= 8;
-    
-    /*
-    var ncnt;
-    switch(ud->TIMER_CNT & 3)
+    if(COMPILER_LIKELY(cycles_left < step_period))
     {
-        case 0:
-            ncnt = 256;
-            break;
-        case 1:
-            ncnt = 4;
-            break;
-        case 2:
-            ncnt = 16;
-            break;
-        case 3:
-            ncnt = 64;
-            break; 
-        
-        default:
-            __builtin_unreachable();
+        // nothing
     }
-    */
-    
-    
-    if(nres >= ncnt)
+    else
     {
-        var tv = ud->TIMER_ACCUM;
+        var timer_value = ud->TIMER_ACCUM;
+        var IF = 0;
         
-        do
+        for(;;)
         {
-            if((++tv) >> 8)
+            if(COMPILER_LIKELY((++timer_value) <= 0xFF))
             {
-                tv = ud->TIMER_LOAD;
-                ud->mb->IF |= 4;
+                // nothing
+            }
+            else
+            {
+                timer_value = ud->TIMER_LOAD;
+                IF = 4;
             }
             
-            nres -= ncnt;
+            cycles_left -= step_period;
+            
+            if(COMPILER_LIKELY(cycles_left < step_period))
+                break;
         }
-        while(nres >= ncnt);
         
-        ud->TIMER_ACCUM = tv;
+        if(!IF)
+            ;
+        else
+            ud->mb->IF |= IF;
+        
+        ud->TIMER_ACCUM = timer_value;
     }
     
-    ud->TIMER_SUB = nres;
+    ud->TIMER_SUB = cycles_left;
 }
 
 PGB_FUNC const r8* pgf_resolve_ROM(void* userdata, word addr, word bank)
