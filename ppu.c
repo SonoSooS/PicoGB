@@ -2,7 +2,7 @@
 
 #include <assert.h>
 
-#define self ppu_t* __restrict pp
+#define self ppu_t* __restrict
 #define USE_STATE struct ppu_state_t* __restrict ps = &pp->state;
 
 //#define PPU_DEBUG
@@ -49,7 +49,7 @@
 
 #define crossed(tresh,prev,val) (((prev)<(tresh))&&((val)>=(tresh)))
 
-PGB_FUNC void ppu_reset(self)
+PGB_FUNC void ppu_reset(self pp)
 {
     USE_STATE;
     
@@ -67,7 +67,7 @@ PGB_FUNC void ppu_reset(self)
     pp->rSTAT = (pp->rSTAT & 0xFC) | 2;
 }
 
-PGB_FUNC void ppu_initialize(self)
+PGB_FUNC void ppu_initialize(self pp)
 {
     pp->is_cgb = 0;
     
@@ -94,7 +94,7 @@ PGB_FUNC void ppu_initialize(self)
     ppu_reset(pp);
 }
 
-PGB_FUNC void ppu_turn_off(self)
+PGB_FUNC void ppu_turn_off(self pp)
 {
     USE_STATE;
     
@@ -106,7 +106,7 @@ PGB_FUNC void ppu_turn_off(self)
     ps->subclk = 0;
 }
 
-PGB_FUNC static inline __attribute__((optimize("O2"))) const r8* __restrict ppu_resolve_line_tile(const self, word idx, word line)
+PGB_FUNC static inline __attribute__((optimize("O2"))) const r8* __restrict ppu_resolve_line_tile(const self pp, word idx, word line)
 {
     const r8* __restrict ret;
     var LCDC;
@@ -154,13 +154,13 @@ PGB_FUNC static inline __attribute__((optimize("O2"))) const r8* __restrict ppu_
     */
 }
 
-PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite(const self, word idx, word line)
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite(const self pp, word idx, word line)
 {
     return &pp->VRAM[(idx << 4) | (line << 1)];
 }
 
 #if CONFIG_IS_CGB
-PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(const self, word idx, word line)
+PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(const self pp, word idx, word line)
 {
     return &pp->VRAM[((idx << 4) | (line << 1)) | 0x2000];
 }
@@ -180,7 +180,7 @@ PGB_FUNC static inline const r8* __restrict ppu_resolve_line_sprite_cgb1(const s
 #error Undefined PPU mode
 #endif
 
-PGB_FUNC static void ppu_render_tile_line(self, pixel_t* __restrict scanline, const r8* __restrict tiledata, word attr)
+PGB_FUNC static void ppu_render_tile_line(self pp, pixel_t* __restrict scanline, const r8* __restrict tiledata, word attr)
 {
     var tl = tiledata[0];
     var th = tiledata[1];
@@ -325,7 +325,7 @@ PGB_FUNC static void ppu_render_tile_line(self, pixel_t* __restrict scanline, co
     #endif
 }
 
-PGB_FUNC static void ppu_render_scanline(self)
+PGB_FUNC static void ppu_render_scanline(self pp)
 {
     USE_STATE;
     
@@ -466,14 +466,14 @@ PGB_FUNC static void ppu_render_scanline(self)
     }
 }
 
-PGB_FUNC static inline word ppu_stat_set_mode(self, word mode)
+PGB_FUNC static inline word ppu_stat_set_mode(self pp, word mode)
 {
     var prev = pp->rSTAT & 3;
     pp->rSTAT = (pp->rSTAT & 0xFC) | (mode & 3);
     return prev;
 }
 
-PGB_FUNC static void ppu_update_LYC(self, word scanY)
+PGB_FUNC static void ppu_update_LYC(self pp, word scanY)
 {
     if(scanY == pp->rLYC)
     {
@@ -488,7 +488,7 @@ PGB_FUNC static void ppu_update_LYC(self, word scanY)
     }
 }
 
-PGB_FUNC static void ppu_update_newline(self, word scanY)
+PGB_FUNC static void ppu_update_newline(self pp, word scanY)
 {
     ppu_update_LYC(pp, scanY);
     
@@ -512,18 +512,18 @@ PGB_FUNC static void ppu_update_newline(self, word scanY)
     }
 }
 
-PGB_FUNC void ppu_turn_on(self)
+PGB_FUNC void ppu_turn_on(self pp)
 {
     ppu_reset(pp);
     ppu_update_LYC(pp, pp->state.scanY);
 }
 
-PGB_FUNC void ppu_on_write_LYC(self)
+PGB_FUNC void ppu_on_write_LYC(self pp)
 {
     ppu_update_LYC(pp, pp->state.scanY);
 }
 
-PGB_FUNC static inline void ppu_trigger_oam_scan(self)
+PGB_FUNC static inline void ppu_trigger_oam_scan(self pp)
 {
     USE_STATE;
     
@@ -564,7 +564,7 @@ PGB_FUNC static inline void ppu_trigger_oam_scan(self)
         ps->latches[j++].low = 0;
 }
 
-PGB_FUNC static inline void ppu_trigger_scanline_draw(self)
+PGB_FUNC static inline void ppu_trigger_scanline_draw(self pp)
 {
     USE_STATE;
     
@@ -593,7 +593,7 @@ PGB_FUNC static inline void ppu_trigger_scanline_draw(self)
         ++(pp->_internal_WY);
 }
 
-PGB_FUNC static inline word ppu_tick_internal_0(self)
+PGB_FUNC static inline word ppu_tick_internal_0(self pp)
 {
     var scanY = pp->state.scanY;
     
@@ -606,7 +606,7 @@ PGB_FUNC static inline word ppu_tick_internal_0(self)
     return scanY < 144;
 }
 
-PGB_FUNC static inline void ppu_tick_internal_1(self)
+PGB_FUNC static inline void ppu_tick_internal_1(self pp)
 {
     ppu_stat_set_mode(pp, 3);
     
@@ -617,7 +617,7 @@ PGB_FUNC static inline void ppu_tick_internal_1(self)
 #endif
 }
 
-PGB_FUNC static inline void ppu_tick_internal_2(self)
+PGB_FUNC static inline void ppu_tick_internal_2(self pp)
 {
     ppu_stat_set_mode(pp, 0);
     
@@ -629,7 +629,7 @@ PGB_FUNC static inline void ppu_tick_internal_2(self)
 #endif
 }
 
-PGB_FUNC static inline void ppu_tick_internal_3(self)
+PGB_FUNC static inline void ppu_tick_internal_3(self pp)
 {
     USE_STATE;
     
@@ -647,7 +647,7 @@ PGB_FUNC static inline void ppu_tick_internal_3(self)
     ps->scanY = scanY;
 }
 
-PGB_FUNC void ppu_tick_internal(self, word ncycles, word rem)
+PGB_FUNC void ppu_tick_internal(self pp, word ncycles, word rem)
 {
     var ren = pp->next_update_n;
     
