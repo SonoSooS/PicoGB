@@ -1,0 +1,1 @@
+@make -g -Og -finstrument-functions ..\profi.c
