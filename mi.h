@@ -74,7 +74,7 @@ struct mi_dispatch
 #endif
 };
 
-PGB_FUNC static inline void mi_params_from_header(struct mi_dispatch* mi, const r8* __restrict ROM)
+PGB_FUNC static inline void mi_init_params_from_header(struct mi_dispatch* mi, const r8* __restrict ROM)
 {
     mi->ROM_MAPPER = ROM[0x147];
 }

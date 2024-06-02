@@ -800,7 +800,7 @@ int main(int argc, char** argv)
         
         mb.mi = &dis;
         micache_invalidate(&mb.micache);
-        mi_params_from_header(mb.mi, rommap[0]);
+        mi_init_params_from_header(mb.mi, rommap[0]);
         
         mb.IE = 0;
         mb.IF = 0;
@@ -1162,7 +1162,8 @@ int main(int argc, char** argv)
         }
 #endif
         
-        //TODO: 17556 samples per frame
+        //TODO: 17556 samples per frame at 1MiHz
+        //TODO:  4389 samples per frame at 256kiHz (GBA)
         
         mb.DIV += cycles;
         pgf_timer_update(&userdata, cycles);
