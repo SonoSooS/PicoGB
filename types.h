@@ -23,6 +23,10 @@
 #define NULL ((void*)0)
 #endif
 
+#ifndef count_of
+#define count_of(h) (sizeof(h)/sizeof((h)[0]))
+#endif
+
 
 #if PPU_IS_MONOCHROME
 typedef unsigned char pixel_t;

@@ -34,6 +34,7 @@
 #define MB_TYPE_IS_WRITE(type) (!!(type))
 
 #define MB_DATA_DONTCARE 0
+#define MB_DATA_DEFAULT 0xFF
 
 
 struct mb_state

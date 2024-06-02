@@ -962,6 +962,7 @@ int main(int argc, char** argv)
         dis.userdata = &userdata;
         dis.dispatch_IO = cb_IO;
         dis.dispatch_ROM = cb_ROM;
+        //dis.dispatch_ROM = pgf_get_mapper_callback(dis.ROM_MAPPER);
     }
     
     HWND wnd = wnd_create(&userdata);

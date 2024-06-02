@@ -661,7 +661,143 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
     return 0xFF;
 }
 
-static const r8 mappers[0x20] PGB_DATA =
+#pragma region Cartridge mapper impl
+
+// No MBC callback
+PGB_FUNC word pgf_cb_ROM_Dummy(void* userdata, word addr, word data, word type)
+{
+    return MB_DATA_DEFAULT;
+}
+
+PGB_FUNC word pgf_cb_ROM_MBC1(void* userdata, word addr, word data, word type)
+{
+    USE_UD;
+    
+    switch((addr >> 13) & 3)
+    {
+        case 0:
+            break;
+        case 1:
+        {
+            word newbank = data & 0x1F;
+            if(!newbank)
+                newbank = 1;
+            
+            ud->mb->mi->BANK_ROM = newbank & (ud->mb->mi->N_ROM - 1);
+            
+            micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
+            break;
+        }
+        case 2:
+            if(data && (ud->mb->mi->N_ROM > 0x20))
+                assert(!"big MBC1 is not supported yet");
+            break;
+        case 3:
+            if(ud->mb->mi->N_ROM > 0x20)
+                assert(!"banking mode sel for MBC1 is not supported yet");
+            break;
+            
+    }
+    
+    return MB_DATA_DEFAULT;
+}
+
+PGB_FUNC word pgf_cb_ROM_MBC2(void* userdata, word addr, word data, word type)
+{
+    USE_UD;
+    
+    if(!(addr & 0x4000))
+    {
+        if(addr & 0x100)
+        {
+            word newbank = data;
+            if(!newbank)
+                newbank = 1;
+            
+            ud->mb->mi->BANK_ROM = newbank & (ud->mb->mi->N_ROM - 1);
+            
+            micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
+        }
+    }
+    
+    return MB_DATA_DEFAULT;
+}
+
+PGB_FUNC word pgf_cb_ROM_MBC3(void* userdata, word addr, word data, word type)
+{
+    USE_UD;
+    
+    switch((addr >> 13) & 3)
+    {
+        case 0:
+            break;
+        case 1:
+            word newbank = data & 0x7F;
+            if(!newbank)
+                newbank = 1;
+            
+            ud->mb->mi->BANK_ROM = newbank & (ud->mb->mi->N_ROM - 1);
+            
+            micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
+            break;
+        case 2:
+            //assert(!"MBC3 RAM/reg sel is not supported yet");
+            ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
+            micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
+            break;
+        case 3:
+            //assert(!"MBC3 unsupported write");
+            break;
+            
+    }
+    
+    return MB_DATA_DEFAULT;
+}
+
+PGB_FUNC word pgf_cb_ROM_MBC5(void* userdata, word addr, word data, word type)
+{
+    USE_UD;
+    
+    switch((addr >> 12) & 7)
+    {
+        case 0:
+        case 1:
+            break;
+        case 2:
+        {
+            word newrom = (ud->mb->mi->BANK_ROM & ~0xFF) | (data & 0xFF);
+            
+            ud->mb->mi->BANK_ROM = newrom & (ud->mb->mi->N_ROM - 1);
+            
+            micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
+            break;
+        }
+        case 3:
+        {
+            // It should be actually data&1, but
+            //  who cares, it works the same due to ROM size limit
+            word newrom = (ud->mb->mi->BANK_ROM & 0xFF) | ((data & 0xFF) << 8);
+            
+            ud->mb->mi->BANK_ROM = newrom & (ud->mb->mi->N_ROM - 1);
+            
+            micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
+            break;
+        }
+        case 4:
+        case 5:
+            ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
+            micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
+            break;
+        default:
+            //assert(!"MBC5 unsupported write");
+            break;
+            
+    }
+    
+    return MB_DATA_DEFAULT;
+}
+
+static const r8 mapper_indexes[0x20] PGB_DATA =
 {
     0, 1, 1, 1,
     0, 2, 2, 0,
@@ -673,121 +809,38 @@ static const r8 mappers[0x20] PGB_DATA =
     5, 5, 5, 0
 };
 
+static const pmiDispatch mapper_callbacks[5+1] PGB_DATA =
+{
+    pgf_cb_ROM_Dummy,
+    pgf_cb_ROM_MBC1,
+    pgf_cb_ROM_MBC2,
+    pgf_cb_ROM_MBC3,
+    NULL,
+    pgf_cb_ROM_MBC5,
+};
+
+PGB_FUNC pmiDispatch mi_get_mapper_callback(word mapper_id)
+{
+    if(mapper_id >= count_of(mapper_indexes))
+        return NULL;
+    
+    return mapper_callbacks[mapper_indexes[mapper_id]];
+}
+
+//TODO: remove this
 PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
-    var mapper = ud->mb->mi->ROM_MAPPER;
-    assert(mapper < 0x20);
-    var lut = mappers[mapper];
-    switch(lut)
-    {
-        case 0:
-            break;
-        case 1:
-            switch((addr >> 13) & 3)
-            {
-                case 0:
-                    break;
-                case 1:
-                    ud->mb->mi->BANK_ROM = (data & 0x1F);
-                    if(!ud->mb->mi->BANK_ROM)
-                        ud->mb->mi->BANK_ROM = 1;
-                    
-                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
-                    
-                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
-                    break;
-                case 2:
-                    if(data && (ud->mb->mi->N_ROM > 0x20))
-                        assert(!"big MBC1 is not supported yet");
-                    break;
-                case 3:
-                    if(ud->mb->mi->N_ROM > 0x20)
-                        assert(!"banking mode sel for MBC1 is not supported yet");
-                    break;
-                    
-            }
-            break;
-        case 2:
-            if(!(addr & 0x4000))
-            {
-                if(addr & 0x100)
-                {
-                    ud->mb->mi->BANK_ROM = (data);
-                    if(!ud->mb->mi->BANK_ROM)
-                        ud->mb->mi->BANK_ROM = 1;
-                    
-                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
-                    
-                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
-                }
-            }
-            break;
-        case 3:
-            switch((addr >> 13) & 3)
-            {
-                case 0:
-                    break;
-                case 1:
-                    ud->mb->mi->BANK_ROM = (data & 0x7F);
-                    if(!ud->mb->mi->BANK_ROM)
-                        ud->mb->mi->BANK_ROM = 1;
-                    
-                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
-                    
-                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
-                    break;
-                case 2:
-                    //assert(!"MBC3 RAM/reg sel is not supported yet");
-                    ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
-                    micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
-                    break;
-                case 3:
-                    //assert(!"MBC3 unsupported write");
-                    break;
-                    
-            }
-            break;
-        case 5:
-            switch((addr >> 12) & 7)
-            {
-                case 0:
-                case 1:
-                    break;
-                case 2:
-                    ud->mb->mi->BANK_ROM = (data & 0xFF);
-                    if(!ud->mb->mi->BANK_ROM)
-                        ud->mb->mi->BANK_ROM = 1;
-                    
-                    ud->mb->mi->BANK_ROM &= ud->mb->mi->N_ROM - 1;
-                    
-                    micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
-                    break;
-                case 3:
-                    if(data)
-                        assert(!"MBC5 big ROM is not supported yet");
-                    break;
-                case 4:
-                case 5:
-                    ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
-                    micache_invalidate_range(&ud->mb->micache, 0xA000, 0xBFFF);
-                    break;
-                default:
-                    //assert(!"MBC5 unsupported write");
-                    break;
-                    
-            }
-            break;
-        default:
-            assert(!"bad mapper LUT");
-    }
+    pmiDispatch mapper_callback = mi_get_mapper_callback(ud->mb->mi->ROM_MAPPER);
+    assert(mapper_callback != NULL);
     
-    //micache_invalidate(&ud->mb->micache);
-    //micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
-    
-    return 0xFF;
+    return mapper_callback(userdata, addr, data, type);
 }
+
+#pragma endregion
+
+#pragma region iboot interface
 
 #if CONFIG_BOOTMEME
 PGB_FUNC r32 pgf_cb_BOOTROM(void* userdata, r32 addr, r32 data, word type)
@@ -812,6 +865,10 @@ PGB_FUNC r32 pgf_cb_BOOTROM(void* userdata, r32 addr, r32 data, word type)
     return ~0;
 }
 #endif
+
+#pragma endregion
+
+#pragma region Default LRU handler
 
 #if CONFIG_ENABLE_LRU
 PGB_FUNC const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
@@ -849,3 +906,5 @@ PGB_FUNC const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
     return NULL;
 }
 #endif
+
+#pragma endregion

@@ -39,6 +39,14 @@ const r8* pgf_resolve_ROM(void* userdata, word addr, word bank);
 word pgf_cb_ROM_(void* userdata, word addr, word data, word type);
 word pgf_cb_IO_(void* userdata, word addr, word data, word type);
 
+PGB_FUNC word pgf_cb_ROM_Dummy(void* userdata, word addr, word data, word type);
+PGB_FUNC word pgf_cb_ROM_MBC1(void* userdata, word addr, word data, word type);
+PGB_FUNC word pgf_cb_ROM_MBC2(void* userdata, word addr, word data, word type);
+PGB_FUNC word pgf_cb_ROM_MBC3(void* userdata, word addr, word data, word type);
+PGB_FUNC word pgf_cb_ROM_MBC5(void* userdata, word addr, word data, word type);
+
+PGB_FUNC pmiDispatch pgf_get_mapper_callback(word mapper_id);
+
 #if CONFIG_BOOTMEME
 PGB_FUNC r32 pgf_cb_BOOTROM(void* userdata, r32 addr, r32 data, word type);
 #endif
