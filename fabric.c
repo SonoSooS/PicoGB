@@ -732,6 +732,7 @@ PGB_FUNC word pgf_cb_ROM_MBC3(void* userdata, word addr, word data, word type)
         case 0:
             break;
         case 1:
+        {
             word newbank = data & 0x7F;
             if(!newbank)
                 newbank = 1;
@@ -740,6 +741,7 @@ PGB_FUNC word pgf_cb_ROM_MBC3(void* userdata, word addr, word data, word type)
             
             micache_invalidate_range(&ud->mb->micache, 0x4000, 0x7FFF);
             break;
+        }
         case 2:
             //assert(!"MBC3 RAM/reg sel is not supported yet");
             ud->mb->mi->BANK_SRAM = (data & 15) & (ud->mb->mi->N_SRAM - 1);
