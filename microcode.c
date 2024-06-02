@@ -31,6 +31,7 @@
 // Resolve an aligned(!) pointer to a ROM bank,
 //  based on an input address and current banking settings.
 // addr < 0x8000
+//TODO: get rid of this
 PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word r_addr)
 {
     USE_MI;
@@ -50,6 +51,7 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
     
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
+        //TODO: optimize this for LRU
     #if CONFIG_ENABLE_LRU
         if(mi->ROM)
     #endif
@@ -90,22 +92,23 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
         r_addr &= MICACHE_R_VALUE(0x1FFF);
         return &(ptr[r_addr << MICACHE_R_BITS]);
     }
-    else if(r_addr < MICACHE_R_VALUE(0xD000))
+    else // WRAM only [$C000; $FFFF] for OAMDMA
     {
-        r_addr &= MICACHE_R_VALUE(0x0FFF);
-        return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
+        if(!(r_addr & MICACHE_R_VALUE(0x1000)))
+        {
+            r_addr &= MICACHE_R_VALUE(0x0FFF);
+            return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
+        }
+        else
+        {
+            var bank = mi->BANK_WRAM;
+            if(!bank)
+                bank = 1;
+            
+            r_addr &= MICACHE_R_VALUE(0x0FFF);
+            return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
+        }
     }
-    else if(r_addr < MICACHE_R_VALUE(0xE000))
-    {
-        var bank = mi->BANK_WRAM;
-        if(!bank)
-            bank = 1;
-        
-        r_addr &= MICACHE_R_VALUE(0x0FFF);
-        return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
-    }
-    
-    return 0;
 }
 
 PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
@@ -131,23 +134,23 @@ PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
         r_addr &= MICACHE_R_VALUE(0x1FFF);
         return &(ptr[r_addr << MICACHE_R_BITS]);
     }
-    else if(r_addr < MICACHE_R_VALUE(0xD000))
+    else // WRAM only [$C000; $FFFF] for OAMDMA
     {
-        r_addr &= MICACHE_R_VALUE(0x0FFF);
-        return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
+        if(!(r_addr & MICACHE_R_VALUE(0x1000)))
+        {
+            r_addr &= MICACHE_R_VALUE(0x0FFF);
+            return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
+        }
+        else
+        {
+            var bank = mi->BANK_WRAM;
+            if(!bank)
+                bank = 1;
+            
+            r_addr &= MICACHE_R_VALUE(0x0FFF);
+            return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
+        }
     }
-    else if(r_addr < MICACHE_R_VALUE(0xE000))
-    {
-        var bank = mi->BANK_WRAM;
-        if(!bank)
-            bank = 1;
-        
-        r_addr &= MICACHE_R_VALUE(0x0FFF);
-        return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
-    }
-    
-    // ECHO RAM and IO need special treatment, nocache
-    return 0;
 }
 
 #pragma endregion
@@ -168,12 +171,12 @@ PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_read(self, word addr)
     
 #if !CONFIG_MIC_CACHE_BYPASS
     ptr = mic->mc_read[r_addr];
-    if(ptr)
+    if(COMPILER_LIKELY(!!ptr))
         return &ptr[addr & MICACHE_R_SEL];
 #endif
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
-    if(ptr)
+    if(COMPILER_LIKELY(!!ptr))
     {
         mic->mc_read[r_addr] = ptr;
         return &ptr[addr & MICACHE_R_SEL];
@@ -206,7 +209,7 @@ PGB_FUNC ATTR_HOT static inline r8* mch_resolve_mic_write(self, word addr)
     return 0;
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE static inline const r8* mch_resolve_mic_execute(self, word addr)
+PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_execute(self, word addr)
 {
     USE_MIC;
     
@@ -216,12 +219,12 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE static inline const r8* mch_resolve_mic_exec
     
 #if !CONFIG_MIC_CACHE_BYPASS
     ptr = mic->mc_execute[r_addr];
-    if(ptr)
+    if(COMPILER_LIKELY(!!ptr))
         return &ptr[addr & MICACHE_R_SEL];
 #endif
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
-    if(ptr)
+    if(COMPILER_LIKELY(!!ptr))
     {
         mic->mc_execute[r_addr] = ptr;
         return &ptr[addr & MICACHE_R_SEL];
@@ -244,7 +247,7 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
         {
             USE_MI;
             
-            return mi->HRAM[hm & 0x7F];
+            return mi->HRAM[hm - 0x80];
         }
         else
         {
@@ -266,7 +269,7 @@ PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word d
         {
             USE_MI;
             
-            mi->HRAM[hm & 0x7F] = data;
+            mi->HRAM[hm - 0x80] = data;
         }
         else
         {
@@ -291,20 +294,13 @@ PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self, word addr,
 #pragma region Dispatch
 
 // Handle read from memory by microcode, including ECHO RAM
-PGB_FUNC ATTR_HOT static word mch_memory_dispatch_read_(self, word addr)
+PGB_FUNC ATTR_HOT __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_(self, word addr)
 {
-    if(addr < 0xE000)
+    if(COMPILER_LIKELY(addr < 0xFE00))
     {
         const r8* ptr;
-    wram_read:
         ptr = mch_resolve_mic_read(mb, addr);
         return *ptr;
-    }
-    
-    if(addr < 0xFE00)
-    {
-        addr -= 0x2000;
-        goto wram_read;
     }
     
     return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
@@ -327,23 +323,14 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 {
     DBGF("- /WR %04X <- %02X\n", addr, data);
     
-    var r_addr = MICACHE_R_VALUE(addr);
-    
-    if(r_addr >= MICACHE_R_VALUE(0x8000))
+    if(COMPILER_LIKELY(addr >= 0x8000))
     {
-        if(r_addr < MICACHE_R_VALUE(0xE000))
+        if(COMPILER_LIKELY(addr < 0xFE00))
         {
             r8* ptr;
-        wram_write:
             ptr = mch_resolve_mic_write(mb, addr);
             *ptr = data;
             return;
-        }
-        else if(addr < 0xFE00)
-        {
-            addr -= 0x2000;
-            r_addr = MICACHE_R_VALUE(addr);
-            goto wram_write;
         }
         
         /*return */mch_memory_dispatch_write_fexx_ffxx(mb, addr, data);
@@ -356,31 +343,36 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 }
 
 // Fetch one byte as part of an instruction
-PGB_FUNC ATTR_HOT static inline word mch_memory_fetch_decode_1(self, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_1(self, word addr)
 {
-    if(addr < 0xE000)
+    if(COMPILER_LIKELY(addr < 0xFE00))
     {
         const r8* ptr;
-    wram_read:
+        
+        // Duplicated code from mch_resolve_mic_execute due to gcc being silly
+    #if !CONFIG_MIC_CACHE_BYPASS
+        var r_addr = MICACHE_R_VALUE(addr);
+        COMPILER_VARIABLE_BARRIER(r_addr);
+        USE_MIC;
+        ptr = mic->mc_execute[r_addr];
+        COMPILER_VARIABLE_BARRIER(ptr);
+        if(COMPILER_LIKELY(ptr != 0))
+            return ptr[addr & MICACHE_R_SEL];
+    #endif
+        
         ptr = mch_resolve_mic_execute(mb, addr);
         return *ptr;
     }
-    
-    if(addr < 0xFE00)
-    {
-        addr -= 0x2000;
-        goto wram_read;
-    }
-    
-    return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
+    else
+        return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_decode_1_noinline(self, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_1_noinline(self, word addr)
 {
     return mch_memory_fetch_decode_1(mb, addr);
 }
 
-PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2_slow(self, word addr)
+PGB_FUNC static word mch_memory_fetch_decode_2_slow(self, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
     
@@ -394,13 +386,14 @@ PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2_slow(self, wo
 }
 
 // Fetch two bytes as part of an instruction
-PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
+PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2(self, word addr)
 {
 #if !CONFIG_MIC_CACHE_BYPASS
-    word addr2 = (addr + 1) & 0xFFFF;
     
-    if(addr <= (0xE000 - 2))
+    if(addr < 0xFE00) // yeah, this is an off-by-one error, and I don't care
     {
+        word addr2 = (addr + 1) & 0xFFFF;
+        
         word r1 = MICACHE_R_VALUE(addr);
         word r2 = MICACHE_R_VALUE(addr2);
         if(r1 == r2)
@@ -418,6 +411,17 @@ PGB_FUNC static word mch_memory_fetch_decode_2(self, word addr)
             return nres;
         }
     }
+    else if((addr >= 0xFF80) && (addr < 0xFFFE))
+    {
+        addr -= 0xFF80;
+        
+        const volatile r8* ptr = &mb->mi->HRAM[addr];
+        
+        var nres = *(ptr++);
+        nres |= *(ptr++) << 8;
+        
+        return nres;
+    }
 #endif
     
     return mch_memory_fetch_decode_2_slow(mb, addr);
@@ -434,14 +438,24 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
     return res;
 }
 
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_1(self)
+{
+    word addr = mb->PC;
+    mb->PC = (addr + 1) & 0xFFFF;
+    
+    var res = mch_memory_fetch_decode_1(mb, addr);
+    DBGF("- /O1 %04X <> %02X\n", addr, res);
+    return res;
+}
+
 // Fetch two bytes from PC, incrementing it both times as well
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_2(self)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_2(self)
 {
     word addr = mb->PC;
     mb->PC = (addr + 2) & 0xFFFF;
     
     word resp = mch_memory_fetch_decode_2(mb, addr);
-    DBGF("- /M2 %04X <> %04X\n", addr, resp);
+    DBGF("- /O2 %04X <> %04X\n", addr, resp);
     return resp;
 }
 
@@ -602,6 +616,7 @@ PGB_FUNC static wbool mbh_cc_check(word IR, word F)
 #pragma endregion
 
 #pragma region disasm (unfinished)
+#if CONFIG_DBG
 
 static const char* str_r8[8] = {"B", "C", "D", "E", "H", "L", "[HL]", "A"};
 static const char* str_aluop[8] = {"ADD", "ADC", "SUB", "SBC", "AND", "XOR", "ORR", "CMP"};
@@ -643,6 +658,7 @@ void mb_disasm_CB(const struct mb_state* __restrict mb, word CBIR)
     puts("");
 }
 
+#endif
 #pragma endregion
 
 PGB_FUNC ATTR_HOT word mb_exec(self)
@@ -846,10 +862,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             goto instr_RET_cc; // could be MB_CC_CHECK optimized, but the extra cycle is too much work to count
         
         case 0xE0:
-            data_wide = 0xFF00 | mch_memory_fetch_PC(mb);
+            data_wide = 0xFF00 | mch_memory_fetch_PC_op_1(mb);
             goto instr_340;
         case 0xF0:
-            data_wide = 0xFF00 | mch_memory_fetch_PC(mb);
+            data_wide = 0xFF00 | mch_memory_fetch_PC_op_1(mb);
             goto instr_360;
         
         case 0xE8:
@@ -868,10 +884,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             goto instr_POP_r16;
         
         case 0xEA:
-            data_wide = mch_memory_fetch_PC_2(mb);
+            data_wide = mch_memory_fetch_PC_op_2(mb);
             goto instr_352;
         case 0xFA:
-            data_wide = mch_memory_fetch_PC_2(mb);
+            data_wide = mch_memory_fetch_PC_op_2(mb);
             goto instr_372;
         
         case 0xE2:
@@ -974,7 +990,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         instr_08:
                         case 1: // LD a16, SP
                         {
-                            data_wide = mch_memory_fetch_PC_2(mb);
+                            data_wide = mch_memory_fetch_PC_op_2(mb);
                             
                             var SP = mb->SP;
                             
@@ -990,7 +1006,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         generic_jr:
                         {
                             var PC = mb->PC;
-                            data_wide = mch_memory_fetch_PC(mb);
+                            data_wide = mch_memory_fetch_PC_op_1(mb);
                             
                             // Wedge if unbreakable spinloop is detected
                             // TODO: unfuck this statement
@@ -1034,7 +1050,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     if(!(IR & 8)) // LD r16, n16
                     {
                         instr_0x1_0:
-                        data_wide = mch_memory_fetch_PC_2(mb);
+                        data_wide = mch_memory_fetch_PC_op_2(mb);
                         
                         *p_reg16_ptr = data_wide;
                         
@@ -1174,7 +1190,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 case 6: // LD r8, n8
                 {
                     instr_0x6:
-                    data_reg = mch_memory_fetch_PC(mb);
+                    data_reg = mch_memory_fetch_PC_op_1(mb);
                     i_dst = IR_F_ROW ^ 1;
                     ++ncycles;
                     goto generic_r8_write;
@@ -1501,7 +1517,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     {
                         if(!(IR & 8)) // LDH n8
                         {
-                            data_wide = 0xFF00 | mch_memory_fetch_PC(mb);
+                            data_wide = 0xFF00 | mch_memory_fetch_PC_op_1(mb);
                             
                             if(IR & 0x10)
                             {
@@ -1523,7 +1539,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         else
                         {
                         instr_weird_r16_r8:
-                            data_wide = mch_memory_fetch_PC(mb);
+                            data_wide = mch_memory_fetch_PC_op_1(mb);
                             if(data_wide >= 0x80)
                                 data_wide |= 0xFF00;
                             
@@ -1647,7 +1663,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     {
                         if(IR & 8)
                         {
-                            data_wide = mch_memory_fetch_PC_2(mb);
+                            data_wide = mch_memory_fetch_PC_op_2(mb);
                             
                             if(IR & 0x10)
                             {
@@ -1710,7 +1726,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         case 0: // JP n16
                         generic_jp_abs:
                         {
-                            data_wide = mch_memory_fetch_PC_2(mb);
+                            data_wide = mch_memory_fetch_PC_op_2(mb);
                             mb->PC = data_wide;
                             ncycles += 2 + 1; // idk why penalty cycle
                             goto generic_fetch;
@@ -1795,7 +1811,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         generic_call:
                         {
                             var PC = mb->PC;
-                            data_wide = mch_memory_fetch_PC_2(mb);
+                            data_wide = mch_memory_fetch_PC_op_2(mb);
                             mb->PC = data_wide;
                             data_wide = (PC + 2) & 0xFFFF;
                             ncycles += 2;
@@ -1814,7 +1830,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 {
                     instr_3x6:
                     ++ncycles;
-                    data_reg = mch_memory_fetch_PC(mb);
+                    data_reg = mch_memory_fetch_PC_op_1(mb);
                     goto alu_op_begin;
                 }
                 
@@ -1855,7 +1871,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
     if(1)
     {
         ++ncycles;
-        var CBIR = mch_memory_fetch_PC(mb);
+        var CBIR = mch_memory_fetch_PC_op_1(mb);
         
     #if CONFIG_DBG
         if(_IS_DBG)
