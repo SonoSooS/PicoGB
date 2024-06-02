@@ -821,7 +821,7 @@ static const pmiDispatch mapper_callbacks[5+1] PGB_DATA =
     pgf_cb_ROM_MBC5,
 };
 
-PGB_FUNC pmiDispatch mi_get_mapper_callback(word mapper_id)
+PGB_FUNC pmiDispatch pgf_get_mapper_callback(word mapper_id)
 {
     if(mapper_id >= count_of(mapper_indexes))
         return NULL;
@@ -834,7 +834,7 @@ PGB_FUNC word pgf_cb_ROM_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
-    pmiDispatch mapper_callback = mi_get_mapper_callback(ud->mb->mi->ROM_MAPPER);
+    pmiDispatch mapper_callback = pgf_get_mapper_callback(ud->mb->mi->ROM_MAPPER);
     assert(mapper_callback != NULL);
     
     return mapper_callback(userdata, addr, data, type);
