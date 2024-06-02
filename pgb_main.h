@@ -15,7 +15,7 @@ static inline word pgb_main_tick(mb_state* __restrict mb, vbool* ticked)
         
         cycles = mb_exec(mb);
         
-        if(ticked)
+        if(ticked != NULL)
             *ticked = 1;
     }
     else if(mb->HALTING)
@@ -23,12 +23,12 @@ static inline word pgb_main_tick(mb_state* __restrict mb, vbool* ticked)
         if(!mb->IR.high)
             mb->IR.high = 1
         
-        if(ticked)
+        if(ticked != NULL)
             *ticked = 0;
     }
     else // ???
     {
-        if(ticked)
+        if(ticked != NULL)
             *ticked = 0;
     }
     

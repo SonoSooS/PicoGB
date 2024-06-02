@@ -56,7 +56,7 @@ static inline void pgf_timer_update(struct pgf_userdata_t* __restrict ud, word t
 
 static inline const r8* pgf_resolve_ROM_internal(void* userdata, word addr, word bank)
 {
-    const r8* res = 0;
+    const r8* res = NULL;
     
     USE_UD;
     
@@ -68,15 +68,15 @@ static inline const r8* pgf_resolve_ROM_internal(void* userdata, word addr, word
 #endif
     {
         res = ud->mb->mi->ROM[bank];
-        if(res)
+        if(res != NULL)
             return &res[addr & 0x3FFF];
     }
     
 #if CONFIG_ENABLE_LRU
     res = ud->mb->mi->dispatch_ROM_Bank(userdata, addr & ~MICACHE_R_SEL, bank);
-    if(res)
+    if(res != NULL)
         return &res[((addr & 0x3FFF) & ~MICACHE_R_SEL) + (addr & MICACHE_R_SEL)];
 #endif
     
-    return 0;
+    return NULL;
 }

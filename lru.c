@@ -33,7 +33,7 @@ PGB_FUNC struct lru_slot* lru_get_read(struct lru_state* lru, word address, word
         return slot;
     }
     
-    return 0;
+    return NULL;
 }
 
 PGB_FUNC struct lru_slot* lru_get_write(struct lru_state* lru, word address, word bank, var* isnew)

@@ -4,7 +4,7 @@
 #include "dbg.h"
 
 
-#define self mb_state* __restrict mb
+#define self mb_state* __restrict
 
 
 #if GBA
@@ -16,7 +16,7 @@
 #endif
 
 #define MB_AF_R ((mb->reg.A << 8) | mb->reg.F)
-#define MB_AF_W(v) {mb->reg.A = ((v) >> 8) & 0xFF; mb->reg.F = (v) & 0xF0;}
+#define MB_AF_W(v) {mb->reg.A = ((v) >> 8) & 0xFF; mb->reg.F = (v) & MB_FLAG_BITS;}
 #define MB_CC_CHECK (mbh_cc_check(IR, mb->reg.F))
 
 #define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
@@ -32,7 +32,7 @@
 //  based on an input address and current banking settings.
 // addr < 0x8000
 //TODO: get rid of this
-PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word r_addr)
+PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self mb, word r_addr)
 {
     USE_MI;
     
@@ -43,29 +43,29 @@ PGB_FUNC static inline const r8* mch_resolve_mic_bank_internal(const self, word 
 #endif
 
 // Uncached resolve aligned readable const memory area, based on address
-PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
+PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self mb, word r_addr)
 {
     USE_MI;
     
-    const r8* ret = 0;
+    const r8* ret = NULL;
     
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
         //TODO: optimize this for LRU
     #if CONFIG_ENABLE_LRU
-        if(mi->ROM)
+        if(mi->ROM != NULL)
     #endif
         {
             if(r_addr < MICACHE_R_VALUE(0x4000))
             {
                 ret = mi->ROM[0];
-                if(ret)
+                if(ret != NULL)
                     return &ret[r_addr << MICACHE_R_BITS];
             }
             else
             {
                 ret = mi->ROM[mi->BANK_ROM];
-                if(ret)
+                if(ret != NULL)
                 {
                     r_addr &= MICACHE_R_VALUE(0x3FFF);
                     return &ret[r_addr << MICACHE_R_BITS];
@@ -111,14 +111,14 @@ PGB_FUNC static const r8* mch_resolve_mic_r_direct_read(const self, word r_addr)
     }
 }
 
-PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
+PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self mb, word r_addr)
 {
     USE_MI;
     
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
         // ROM is *Read-Only* Memory, can't write to it normally
-        return 0;
+        return NULL;
     }
     else if(r_addr < MICACHE_R_VALUE(0xA000))
     {
@@ -161,7 +161,7 @@ PGB_FUNC static r8* mch_resolve_mic_r_direct_write(const self, word r_addr)
     - addr < 0xE000
 */
 
-PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_read(self, word addr)
+PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_read(self mb, word addr)
 {
     USE_MIC;
     
@@ -171,21 +171,21 @@ PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_read(self, word addr)
     
 #if !CONFIG_MIC_CACHE_BYPASS
     ptr = mic->mc_read[r_addr];
-    if(COMPILER_LIKELY(!!ptr))
+    if(COMPILER_LIKELY(ptr != NULL))
         return &ptr[addr & MICACHE_R_SEL];
 #endif
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
-    if(COMPILER_LIKELY(!!ptr))
+    if(COMPILER_LIKELY(ptr != NULL))
     {
         mic->mc_read[r_addr] = ptr;
         return &ptr[addr & MICACHE_R_SEL];
     }
     
-    return 0;
+    return NULL;
 }
 
-PGB_FUNC ATTR_HOT static inline r8* mch_resolve_mic_write(self, word addr)
+PGB_FUNC ATTR_HOT static inline r8* mch_resolve_mic_write(self mb, word addr)
 {
     USE_MIC;
     
@@ -195,21 +195,21 @@ PGB_FUNC ATTR_HOT static inline r8* mch_resolve_mic_write(self, word addr)
     
 #if !CONFIG_MIC_CACHE_BYPASS
     ptr = mic->mc_write[r_addr];
-    if(ptr)
+    if(ptr != NULL)
         return &ptr[addr & MICACHE_R_SEL];
 #endif
     
     ptr = mch_resolve_mic_r_direct_write(mb, r_addr);
-    if(ptr)
+    if(ptr != NULL)
     {
         mic->mc_write[r_addr] = ptr;
         return &ptr[addr & MICACHE_R_SEL];
     }
     
-    return 0;
+    return NULL;
 }
 
-PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_execute(self, word addr)
+PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_execute(self mb, word addr)
 {
     USE_MIC;
     
@@ -219,25 +219,25 @@ PGB_FUNC ATTR_HOT static inline const r8* mch_resolve_mic_execute(self, word add
     
 #if !CONFIG_MIC_CACHE_BYPASS
     ptr = mic->mc_execute[r_addr];
-    if(COMPILER_LIKELY(!!ptr))
+    if(COMPILER_LIKELY(ptr != NULL))
         return &ptr[addr & MICACHE_R_SEL];
 #endif
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
-    if(COMPILER_LIKELY(!!ptr))
+    if(COMPILER_LIKELY(ptr != NULL))
     {
         mic->mc_execute[r_addr] = ptr;
         return &ptr[addr & MICACHE_R_SEL];
     }
     
-    return 0;
+    return NULL;
 }
 
 #pragma endregion
 
 #pragma region Dispatch special (IO + ROM)
 
-PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
+PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self mb, word addr)
 {
     if(addr >= 0xFF80) // HRAM + IE
     {
@@ -256,10 +256,10 @@ PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self, word addr)
     }
     
     // Handle IO by fabric
-    return mb->mi->dispatch_IO(mb->mi->userdata, addr, 0, 0);
+    return mb->mi->dispatch_IO(mb->mi->userdata, addr, MB_DATA_DONTCARE, MB_TYPE_READ);
 }
 
-PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word data)
+PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self mb, word addr, word data)
 {
     if(addr >= 0xFF80) // HRAM + IE
     {
@@ -280,13 +280,13 @@ PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self, word addr, word d
     }
     
     // Handle IO by fabric
-    mb->mi->dispatch_IO(mb->mi->userdata, addr, data, 1);
+    mb->mi->dispatch_IO(mb->mi->userdata, addr, data, MB_TYPE_WRITE);
 }
 
-PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self, word addr, word data)
+PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self mb, word addr, word data)
 {
     // Write to ROM has special meaning, handle by fabric
-    mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, 1);
+    mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, MB_TYPE_WRITE);
 }
 
 #pragma endregion
@@ -294,7 +294,7 @@ PGB_FUNC static inline void mch_memory_dispatch_write_ROM(const self, word addr,
 #pragma region Dispatch
 
 // Handle read from memory by microcode, including ECHO RAM
-PGB_FUNC ATTR_HOT __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_(self, word addr)
+PGB_FUNC ATTR_HOT __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_(self mb, word addr)
 {
     if(COMPILER_LIKELY(addr < 0xFE00))
     {
@@ -319,7 +319,7 @@ PGB_FUNC static word mch_memory_dispatch_read(self, word addr)
 #endif
 
 // Handle write to address from microcode, including ECHO RAM support
-PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
+PGB_FUNC static void mch_memory_dispatch_write(self mb, word addr, word data)
 {
     DBGF("- /WR %04X <- %02X\n", addr, data);
     
@@ -343,7 +343,7 @@ PGB_FUNC static void mch_memory_dispatch_write(self, word addr, word data)
 }
 
 // Fetch one byte as part of an instruction
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_1(self, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_1(self mb, word addr)
 {
     if(COMPILER_LIKELY(addr < 0xFE00))
     {
@@ -356,7 +356,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static wor
         USE_MIC;
         ptr = mic->mc_execute[r_addr];
         COMPILER_VARIABLE_BARRIER(ptr);
-        if(COMPILER_LIKELY(ptr != 0))
+        if(COMPILER_LIKELY(ptr != NULL))
             return ptr[addr & MICACHE_R_SEL];
     #endif
         
@@ -367,12 +367,12 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static wor
         return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_1_noinline(self, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_1_noinline(self mb, word addr)
 {
     return mch_memory_fetch_decode_1(mb, addr);
 }
 
-PGB_FUNC static word mch_memory_fetch_decode_2_slow(self, word addr)
+PGB_FUNC static word mch_memory_fetch_decode_2_slow(self mb, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
     
@@ -386,7 +386,7 @@ PGB_FUNC static word mch_memory_fetch_decode_2_slow(self, word addr)
 }
 
 // Fetch two bytes as part of an instruction
-PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2(self, word addr)
+PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2(self mb, word addr)
 {
 #if !CONFIG_MIC_CACHE_BYPASS
     
@@ -428,7 +428,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2(self, word ad
 }
 
 // Fetch one byte from PC, incrementing it as well
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self mb)
 {
     word addr = mb->PC;
     mb->PC = (addr + 1) & 0xFFFF;
@@ -438,7 +438,7 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self)
     return res;
 }
 
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_1(self)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_1(self mb)
 {
     word addr = mb->PC;
     mb->PC = (addr + 1) & 0xFFFF;
@@ -449,7 +449,7 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_1(self)
 }
 
 // Fetch two bytes from PC, incrementing it both times as well
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_2(self)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_2(self mb)
 {
     word addr = mb->PC;
     mb->PC = (addr + 2) & 0xFFFF;
@@ -465,57 +465,57 @@ PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_2(self)
 
 #pragma region Flag mode control
 
-PGB_FUNC static inline void mbh_fr_set_r8_add(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_add(self mb, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADD_r8;
 }
 
-PGB_FUNC static inline void mbh_fr_set_r8_adc(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_adc(self mb, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADC_r8;
 }
 
-PGB_FUNC static inline void mbh_fr_set_r8_sub(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_sub(self mb, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_SUB_r8;
 }
 
-PGB_FUNC static inline void mbh_fr_set_r8_sbc(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r8_sbc(self mb, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_SBC_r8;
 }
 
-PGB_FUNC static inline void mbh_fr_set_r16_add(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r16_add(self mb, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADD_r16;
 }
 
-PGB_FUNC static inline void mbh_fr_set_r16_add_r8(self, word left, word right)
+PGB_FUNC static inline void mbh_fr_set_r16_add_r8(self mb, word left, word right)
 {
     mb->FR1 = left;
     mb->FR2 = right;
     mb->FMC_MODE = MB_FMC_MODE_ADD_r16_r8;
 }
 
-PGB_FUNC word mbh_fr_get(self, word Fin)
+PGB_FUNC word mbh_fr_get(self mb, word Fin)
 {
-    if(!mb->FMC_MODE)
+    if(mb->FMC_MODE == MB_FMC_MODE_NONE)
         return Fin;
     
     var n1 = mb->FR1;
     var n2 = mb->FR2;
     
-    Fin &= 0xD0;
+    Fin &= ~MB_FLAG_H; //TODO: why clear HC here? explain.
     
     switch(mb->FMC_MODE & 0xF)
     {
@@ -526,7 +526,7 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
         {
             //if(((n1 & 0xF00) + (n2 & 0xF00)) > 0xFFF)
             if(((n1 & 0xF) + (n2 & 0xF)) > 0xF) // ???
-                Fin |= 0x20;
+                Fin |= MB_FLAG_H;
             
             break;
         }
@@ -534,7 +534,7 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
         case MB_FMC_MODE_ADD_r16:
         {
             if(((n1 & 0xFFF) + (n2 & 0xFFF)) > 0xFFF)
-                Fin |= 0x20;
+                Fin |= MB_FLAG_H;
             
             break;
         }
@@ -543,7 +543,7 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
         case MB_FMC_MODE_ADD_r8:
         {
             if(((n1 & 0xF) + (n2 & 0xF)) > 0xF)
-                Fin |= 0x20;
+                Fin |= MB_FLAG_H;
             
             break;
         }
@@ -551,7 +551,7 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
         case MB_FMC_MODE_ADC_r8:
         {
             if(((n1 & 0xF) + (n2 & 0xF) + 1) > 0xF)
-                Fin |= 0x20;
+                Fin |= MB_FLAG_H;
             
             break;
         }
@@ -559,7 +559,7 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
         case MB_FMC_MODE_SUB_r8:
         {
             if((n1 & 0xF) < (n2 & 0xF))
-                Fin |= 0x20;
+                Fin |= MB_FLAG_H;
             
             break;
         }
@@ -567,47 +567,47 @@ PGB_FUNC word mbh_fr_get(self, word Fin)
         case MB_FMC_MODE_SBC_r8:
         {
             if((n1 & 0xF) < ((n2 & 0xF) + 1))
-                Fin |= 0x20;
+                Fin |= MB_FLAG_H;
             
             break;
         }
     }
     
-    mb->FMC_MODE = 0;
+    mb->FMC_MODE = MB_FMC_MODE_NONE;
     return Fin;
 }
 
 PGB_FUNC static inline wbool mbh_cc_check_0(word F)
 {
-    return ~F & 0x80; // NZ
+    return ~F & MB_FLAG_Z; // NZ
 }
 
 PGB_FUNC static inline wbool mbh_cc_check_1(word F)
 {
-    return F & 0x80; // Z
+    return F & MB_FLAG_Z; // Z
 }
 
 PGB_FUNC static inline wbool mbh_cc_check_2(word F)
 {
-    return ~F & 0x10; // NC
+    return ~F & MB_FLAG_C; // NC
 }
 
 PGB_FUNC static inline wbool mbh_cc_check_3(word F)
 {
-    return F & 0x10; // C
+    return F & MB_FLAG_C; // C
 }
 
 PGB_FUNC static wbool mbh_cc_check(word IR, word F)
 {
     register word IR_r = (IR >> 3) & 3;
     
-    if(IR_r == 0)
+    if(IR_r == MB_CC_NZ)
         return mbh_cc_check_0(F); // NZ
-    else if(IR_r == 1)
+    else if(IR_r == MB_CC_Z)
         return mbh_cc_check_1(F); // Z
-    else if(IR_r == 2)
+    else if(IR_r == MB_CC_NC)
         return mbh_cc_check_2(F); // NC
-    else if(IR_r == 3)
+    else if(IR_r == MB_CC_C)
         return mbh_cc_check_3(F); // C
     
     __builtin_unreachable();
@@ -661,7 +661,7 @@ void mb_disasm_CB(const struct mb_state* __restrict mb, word CBIR)
 #endif
 #pragma endregion
 
-PGB_FUNC ATTR_HOT word mb_exec(self)
+PGB_FUNC ATTR_HOT word mb_exec(self mb)
 {
     register var IR = mb->IR.low;
     r16* __restrict p_reg16_ptr;
@@ -1062,12 +1062,12 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         instr_0x1_1:
                         
                         data_reg = *p_reg16_ptr;
-                        data_flags = mb->reg.F & 0x80;
+                        data_flags = mb->reg.F & MB_FLAG_Z;
                         
                         data_result = mb->reg.HL;
                         word mres = data_result + data_reg;
                         if(mres >> 16)
-                            data_flags |= 0x10;
+                            data_flags |= MB_FLAG_C;
                         
                         mb->reg.HL = mres;
                         mb->reg.F = data_flags;
@@ -1143,7 +1143,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     
                     i_dst = IR_F_ROW ^ 1;
                     
-                    data_flags = mb->reg.F & 0x10;
+                    data_flags = mb->reg.F & MB_FLAG_C;
                     
                     if(i_dst != 7)
                         data_reg = mb->reg.raw8[i_dst];
@@ -1155,10 +1155,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     
                     if(IR & 1) // DEC
                     {
-                        data_flags |= 0x40;
+                        data_flags |= MB_FLAG_N;
                         
                         if((data_reg & 0xF) == 0)
-                            data_flags |= 0x20;
+                            data_flags |= MB_FLAG_H;
                         
                         data_reg = (data_reg - 1) & 0xFF;
                     }
@@ -1167,14 +1167,14 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         data_reg = (data_reg + 1) & 0xFF;
                         
                         if((data_reg & 0xF) == 0)
-                            data_flags |= 0x20;
+                            data_flags |= MB_FLAG_H;
                     }
                     
                     if(!data_reg)
-                        data_flags |= 0x80;
+                        data_flags |= MB_FLAG_Z;
                     
                     mb->reg.F = data_flags;
-                    mb->FMC_MODE = 0; // we calculate flags in-place
+                    mb->FMC_MODE = MB_FMC_MODE_NONE; // we calculate flags in-place
                     
                     if(i_dst != 7)
                         mb->reg.raw8[i_dst] = data_reg;
@@ -1205,98 +1205,98 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         case 0: // RLCA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
-                            data_flags &= 0x10;
+                            data_flags &= MB_FLAG_C;
                             data_reg = (data_reg << 1) | (data_reg >> 7);
-                            data_flags = (data_reg >> 4) & 0x10;
+                            data_flags = (data_reg >> 4) & 0x10; // Cy flag
                             mb->reg.A = data_reg & 0xFF;
                             mb->reg.F = data_flags;
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         instr_017:
                         case 1: // RRCA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
-                            data_flags &= 0x10;
+                            data_flags &= MB_FLAG_C;
                             data_reg = (data_reg << 7) | (data_reg >> 1);
-                            data_flags = (data_reg >> 3) & 0x10;
+                            data_flags = (data_reg >> 3) & 0x10; // Cy flag
                             mb->reg.A = data_reg & 0xFF;
                             mb->reg.F = data_flags;
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         instr_027:
                         case 2: // RLA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
-                            data_flags &= 0x10;
+                            data_flags &= MB_FLAG_C;
                             data_reg = (data_reg << 1) | ((data_flags >> 4) & 1);
-                            data_flags = (data_reg >> 4) & 0x10;
+                            data_flags = (data_reg >> 4) & 0x10; // Cy flag
                             mb->reg.A = data_reg & 0xFF;
                             mb->reg.F = data_flags;
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         instr_037:
                         case 3: // RRA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
-                            data_flags &= 0x10;
+                            data_flags &= MB_FLAG_C;
                             data_reg = (data_reg << 8) | (data_reg >> 1) | ((data_flags & 0x10) << 3);
-                            data_flags = (data_reg >> 4) & 0x10;
+                            data_flags = (data_reg >> 4) & 0x10; // Cy flag
                             mb->reg.A = data_reg & 0xFF;
                             mb->reg.F = data_flags;
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         instr_047:
                         case 4: // fuck DAA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
-                            data_flags &= 0x70;
+                            data_flags &= ~MB_FLAG_Z;
                             
                             data_flags = mbh_fr_get(mb, data_flags);
                             
-                            if(!(data_flags & 0x40))
+                            if(!(data_flags & MB_FLAG_N))
                             {
-                                if((data_flags & 0x20) || ((data_reg & 0xF) > 9))
+                                if((data_flags & MB_FLAG_H) || ((data_reg & 0xF) > 9))
                                 {
                                     data_reg += 6;
-                                    data_flags |= 0x20;
+                                    data_flags |= MB_FLAG_H;
                                 }
                                 
-                                if((data_flags & 0x10) || (((data_reg >> 4) & 0x1F) > 9))
+                                if((data_flags & MB_FLAG_C) || (((data_reg >> 4) & 0x1F) > 9))
                                 {
                                     data_reg += 6 << 4;
-                                    data_flags |= 0x10;
+                                    data_flags |= MB_FLAG_C;
                                 }
                             }
                             else
                             {
-                                // why the fuck the assemmetry???
+                                // why the assymmetry???
                                 
-                                if((data_flags & 0x20))// || ((wdat & 0xF) > 9))
+                                if((data_flags & MB_FLAG_H))// || ((wdat & 0xF) > 9))
                                 {
                                     data_reg -= 6;
-                                    data_flags |= 0x20;
+                                    data_flags |= MB_FLAG_H;
                                 }
                                 
-                                if((data_flags & 0x10))// || (((wdat >> 4) & 0x1F) > 9))
+                                if((data_flags & MB_FLAG_C))// || (((wdat >> 4) & 0x1F) > 9))
                                 {
                                     data_reg -= 6 << 4;
-                                    data_flags |= 0x10;
+                                    data_flags |= MB_FLAG_C;
                                 }
                             }
                             
-                            data_flags &= 0x50;
+                            data_flags &= (MB_FLAG_C | MB_FLAG_N);
                             
                             data_reg &= 0xFF;
                             if(!data_reg)
-                                data_flags |= 0x80;
+                                data_flags |= MB_FLAG_Z;
                             mb->reg.A = data_reg;
                             mb->reg.F = data_flags;
                             
@@ -1304,24 +1304,24 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         
                         instr_057:
                         case 5: // CPL A
-                            mb->reg.F |= 0x60;
+                            mb->reg.F |= MB_FLAG_N | MB_FLAG_H;
                             mb->reg.A = ~mb->reg.A;
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         instr_067:
                         case 6: // SET Cy
-                            mb->reg.F = (mb->reg.F & 0x80) | 0x10;
+                            mb->reg.F = (mb->reg.F & MB_FLAG_Z) | MB_FLAG_C;
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         instr_077:
                         case 7: // CPL Cy
-                            mb->reg.F = (mb->reg.F ^ 0x10) & 0x90;
+                            mb->reg.F = (mb->reg.F ^ MB_FLAG_C) & (MB_FLAG_C | MB_FLAG_Z);
                             
-                            mb->FMC_MODE = 0;
+                            mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
                         default:
@@ -1404,7 +1404,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 instr_ALU_0_cont:
                     data_result = data_result + data_reg;
                     if(data_result >> 8)
-                        data_flags = 0x10;
+                        data_flags = MB_FLAG_C;
                     else
                         data_flags = 0;
                     
@@ -1431,15 +1431,15 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 instr_ALU_2_cont:
                     data_result = data_result - data_reg;
                     if(data_result >> 8)
-                        data_flags = 0x50;
+                        data_flags = MB_FLAG_N | MB_FLAG_C;
                     else
-                        data_flags = 0x40;
+                        data_flags = MB_FLAG_N;
                     
                     break;
                 
                 //instr_ALU_3:
                 case 3: // SBC Z1HC
-                    if(mb->reg.F & 0x10)
+                    if(mb->reg.F & MB_FLAG_C)
                     {
                         mbh_fr_set_r8_sbc(mb, data_result, data_reg);
                         data_reg += 1;
@@ -1456,12 +1456,12 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                     
                     data_result = data_result - data_reg;
                     if(data_result >> 8)
-                        data_flags = 0x50;
+                        data_flags = MB_FLAG_N | MB_FLAG_C;
                     else
-                        data_flags = 0x40;
+                        data_flags = MB_FLAG_N;
                     
                     if(!(data_result & 0xFF))
-                        data_flags |=0x80;
+                        data_flags |= MB_FLAG_Z;
                     
                     mb->reg.F = data_flags;
                     
@@ -1469,15 +1469,15 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 
                 //instr_ALU_4:
                 case 4: // AND Z010
-                    mb->FMC_MODE = 0;
+                    mb->FMC_MODE = MB_FMC_MODE_NONE;
                     
-                    data_flags = 0x20;
+                    data_flags = MB_FLAG_H;
                     data_result &= data_reg;
                     break;
                 
                 //instr_ALU_5:
                 case 5: // XOR Z000
-                    mb->FMC_MODE = 0;
+                    mb->FMC_MODE = MB_FMC_MODE_NONE;
                     
                     data_flags = 0;
                     data_result ^= data_reg;
@@ -1485,7 +1485,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 
                 //instr_ALU_6:
                 case 6: // ORR Z000
-                    mb->FMC_MODE = 0;
+                    mb->FMC_MODE = MB_FMC_MODE_NONE;
                     
                     data_flags = 0;
                     data_result |= data_reg;
@@ -1496,7 +1496,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
             }
             
             if(!(data_result & 0xFF))
-                data_flags |= 0x80;
+                data_flags |= MB_FLAG_Z;
             
             {
                 hilow16_t sta;
@@ -1545,15 +1545,15 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                             
                             data_reg = mb->SP;
                             //mbh_fr_set_r16_add_r8(mb, data_reg, data_wide);
-                            mb->FMC_MODE = 0; // fuck this, the call rate is so low that it's cheaper to do in-place
+                            mb->FMC_MODE = MB_FMC_MODE_NONE; // fuck this, the call rate is so low that it's cheaper to do this in-place
                             
                             data_flags = 0;
                             
                             if(((data_wide & 0xFF) + (data_reg & 0xFF)) >> 8)
-                                data_flags |= 0x10;
+                                data_flags |= MB_FLAG_C;
                             
                             if(((data_wide & 0xF) + (data_reg & 0xF)) >> 4)
-                                data_flags |= 0x20;
+                                data_flags |= MB_FLAG_H;
                             
                             data_wide = (data_wide + data_reg) & 0xFFFF;
                             
@@ -1650,7 +1650,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         else
                         {
                             MB_AF_W(data_wide);
-                            mb->FMC_MODE = 0; // overwritten manually
+                            mb->FMC_MODE = MB_FMC_MODE_NONE; // overwritten manually from stack
                         }
                         
                         goto generic_fetch;
@@ -1896,37 +1896,37 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
         {
             case 0: // CB OP
                 data_flags = mb->reg.F;
-                data_flags &= 0x10;
+                data_flags &= MB_FLAG_C;
                 
                 switch(i_src)
                 {
                     case 0: // RLC
                         data_reg = (data_reg << 1) | (data_reg >> 7);
-                        data_flags = (data_reg >> 4) & 0x10;
+                        data_flags = (data_reg >> 4) & 0x10; // Cy flag
                         break;
                     
                     case 1: // RRC
                         data_reg = (data_reg << 7) | (data_reg >> 1);
-                        data_flags = (data_reg >> 3) & 0x10;
+                        data_flags = (data_reg >> 3) & 0x10; // Cy flag
                         break;
                     
                     case 2: // RL
                         data_reg = (data_reg << 1) | ((data_flags >> 4) & 1);
-                        data_flags = (data_reg >> 4) & 0x10;
+                        data_flags = (data_reg >> 4) & 0x10; // Cy flag
                         break;
                     
                     case 3: // RR
                         data_reg = (data_reg << 8) | (data_reg >> 1) | ((data_flags & 0x10) << 3);
-                        data_flags = (data_reg >> 4) & 0x10;
+                        data_flags = (data_reg >> 4) & 0x10; // Cy flag
                         break;
                     
                     case 4: // LSL
                         data_reg = (data_reg << 1);
-                        data_flags = (data_reg >> 4) & 0x10;
+                        data_flags = (data_reg >> 4) & 0x10; // Cy flag
                         break;
                     
                     case 5: // ASR
-                        data_flags = (data_reg & 1) << 4;
+                        data_flags = (data_reg & 1) << 4; // Cy flag
                         data_reg = (data_reg >> 1) | (data_reg & 0x80);
                         break;
                     
@@ -1936,14 +1936,14 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                         break;
                     
                     case 7: // LSR
-                        data_flags = (data_reg & 1) << 4;
+                        data_flags = (data_reg & 1) << 4; // Cy flag
                         data_reg = (data_reg >> 1);
                         break;
                 }
                 
                 data_reg &= 0xFF;
                 if(!data_reg)
-                    data_flags |= 0x80;
+                    data_flags |= MB_FLAG_Z;
                 
                 mb->reg.F = data_flags;
                 goto cb_writeback;
@@ -1952,9 +1952,9 @@ PGB_FUNC ATTR_HOT word mb_exec(self)
                 data_flags = mb->reg.F;
                 
                 if(data_reg & (1 << i_src))
-                    data_flags = (data_flags & 0x10) | 0x20;
+                    data_flags = (data_flags & MB_FLAG_C) | (MB_FLAG_H);
                 else
-                    data_flags = (data_flags & 0x10) | 0xA0;
+                    data_flags = (data_flags & MB_FLAG_C) | (MB_FLAG_H | MB_FLAG_Z);
                 
                 mb->reg.F = data_flags;
                 

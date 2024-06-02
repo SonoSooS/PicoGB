@@ -69,7 +69,7 @@ PGB_FUNC const r8* __restrict pgf_resolve_octant(void* userdata, word addr_oct)
 {
     USE_UD;
     
-    const r8* __restrict SRC = 0;
+    const r8* __restrict SRC = NULL;
     
     word wb = addr_oct << 8;
     
@@ -105,7 +105,7 @@ PGB_FUNC const r8* __restrict pgf_resolve_octant(void* userdata, word addr_oct)
             break;
         }
         default:
-            SRC = 0;
+            SRC = NULL;
             break;
     }
     
@@ -127,7 +127,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         {
             if(reg == 0)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->JOYP = (data & 0x30);
                     return data;
@@ -143,7 +143,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 1)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     //putchar(data);
                     ud->SB = data;
@@ -153,7 +153,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 2)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->SC = data;
                 }
@@ -168,7 +168,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 4)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->mb->DIV = 0;
                 #if CONFIG_APU_ENABLE
@@ -181,7 +181,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 5)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->TIMER_ACCUM = data;
                     return data;
@@ -191,7 +191,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 6)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->TIMER_LOAD = data;
                     return data;
@@ -201,7 +201,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 7)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     if(!(ud->TIMER_CNT & 4))
                         ud->TIMER_SUB = -2;
@@ -214,7 +214,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 0x0F)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->mb->IF = data & 0x1F;
                     return data;
@@ -227,10 +227,10 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         {
         #if CONFIG_APU_ENABLE_PARTIAL
         #if !CONFIG_APU_ENABLE
-            if(ud->apu)
+            if(ud->apu != NULL)
         #endif
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                     apu_write(ud->apu, reg, data);
                 else
                     return apu_read(ud->apu, reg);
@@ -246,10 +246,10 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         {
         #if CONFIG_APU_ENABLE_PARTIAL
         #if !CONFIG_APU_ENABLE
-            if(ud->apu)
+            if(ud->apu != NULL)
         #endif
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                     apu_write_wave(ud->apu, reg, data);
                 else
                     return apu_read_wave(ud->apu, reg);
@@ -265,7 +265,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             {
                 case 0: // LCDC
                     rv = &ud->ppu->rLCDC;
-                    if(type)
+                    if(MB_TYPE_IS_WRITE(type))
                     {
                         if(!(data & 0x80))
                         {
@@ -279,7 +279,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     }
                     break;
                 case 1: // STAT
-                    if(type)
+                    if(MB_TYPE_IS_WRITE(type))
                     {
                         ud->ppu->rSTAT = (ud->ppu->rSTAT & 0x87) | (data & 0x78);
                         return data;
@@ -299,7 +299,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     return 0x90;
                 #endif
                 case 5: // LYC
-                    if(type)
+                    if(MB_TYPE_IS_WRITE(type))
                     {
                         ud->ppu->rLYC = data & 0xFF;
                         ppu_on_write_LYC(ud->ppu);
@@ -311,7 +311,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     }
                 case 6: // OAMDMA
                 {
-                    if(!type)
+                    if(!MB_TYPE_IS_WRITE(type))
                         return 0xFF;
                     
                     /*
@@ -359,7 +359,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     var w;
                     r8* __restrict OAM = (r8* __restrict)(size_t)&ud->ppu->OAM[0];
                     const r8* __restrict SRC = pgf_resolve_octant(userdata, data & 0xFF);
-                    if(SRC)
+                    if(SRC != NULL)
                     {
                         for(w = 0; w != 160; ++w)
                         {
@@ -389,13 +389,17 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     return 0xFF;
             }
             
-            if(type)
+            // Generic handler for full read-write regs
+            
+            if(MB_TYPE_IS_WRITE(type))
             {
                 *rv = data & 0xFF;
                 return data;
             }
-            
-            return *rv & 0xFF;
+            else
+            {
+                return *rv & 0xFF;
+            }
         }
         else if(reg < 0x68) // misc and CGB garbage
         {
@@ -408,7 +412,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             else if(reg == 0x4F)
             {
             #if CONFIG_FORCE_ENABLE_CGB
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->mb->mi->BANK_VRAM = data & 1;
                     //micache_invalidate(&ud->mb->micache);
@@ -421,19 +425,19 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 0x50)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     #if CONFIG_DBG
-                    _IS_DBG = 1;
+                    _IS_DBG = 1; // Do not debug bootrom (too slow and noisy)
                     #endif
                     
                     //micache_invalidate(&ud->mb->micache);
                     micache_invalidate_range(&ud->mb->micache, 0x0000, 0x7FFF);
                     
                 #if CONFIG_BOOTMEME
-                    if(ud->mb->mi->dispatch_BOOTROM)
+                    if(ud->mb->mi->dispatch_BOOTROM != NULL)
                         ud->mb->mi->dispatch_BOOTROM(userdata, 0, 0, MI_LONGDISPATCH_BOOTROM_LOCK);
-                    ud->mb->mi->dispatch_BOOTROM = 0; // disable iboot interface
+                    ud->mb->mi->dispatch_BOOTROM = NULL; // disable iboot interface
                 #endif
                     
                     return data;
@@ -444,35 +448,35 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         #if CONFIG_FORCE_ENABLE_CGB
             else if(reg == 0x51)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                     ud->GDMA_SRC = (ud->GDMA_SRC & 0x00F0) | ((data & 0xFF) << 8);
                 
                 return 0xFF;
             }
             else if(reg == 0x52)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                     ud->GDMA_SRC = (ud->GDMA_SRC & 0xFF00) | ((data & 0xF0) << 0);
                 
                 return 0xFF;
             }
             else if(reg == 0x53)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                     ud->GDMA_DST = (ud->GDMA_DST & 0x00F0) | ((data & 0xFF) << 8);
                 
                 return 0xFF;
             }
             else if(reg == 0x54)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                     ud->GDMA_DST = (ud->GDMA_DST & 0xFF00) | ((data & 0xF0) << 0);
                 
                 return 0xFF;
             }
             else if(reg == 0x55)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->GDMA_CNT = data & 0xFF;
                     
@@ -522,7 +526,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         #if CONFIG_FORCE_ENABLE_CGB
             else if(reg == 0x68)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->ppu->rBGPI = data | 0x40;
                     return data;
@@ -534,7 +538,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             {
                 var idx = ud->ppu->rBGPI & 0x3F;
                 
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     if(ud->ppu->rBGPI & 0x80)
                         ud->ppu->rBGPI = (idx + 1) | 0xC0;
@@ -558,7 +562,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             }
             else if(reg == 0x6A)
             {
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->ppu->rOBPI = data | 0x40;
                     return data;
@@ -570,7 +574,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             {
                 var idx = ud->ppu->rOBPI & 0x3F;
                 
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     if(ud->ppu->rOBPI & 0x80)
                         ud->ppu->rOBPI = (idx + 1) | 0xC0;
@@ -596,7 +600,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
             else if(reg == 0x70)
             {
             #if CONFIG_FORCE_ENABLE_CGB
-                if(type)
+                if(MB_TYPE_IS_WRITE(type))
                 {
                     ud->mb->mi->BANK_WRAM = data & 7;
                     //micache_invalidate(&ud->mb->micache);
@@ -614,14 +618,14 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 reg -= 0x74;
                 if(reg < 8)
                 {
-                    if(type)
+                    if(MB_TYPE_IS_WRITE(type))
                         ud->mb->mi->BOOTROM_DATA[reg] = data;
                     else
                         return ud->mb->mi->BOOTROM_DATA[reg];
                     
                     return data;
                 }
-                else if(type && ud->mb->mi->dispatch_BOOTROM)
+                else if(MB_TYPE_IS_WRITE(type) && ud->mb->mi->dispatch_BOOTROM != NULL)
                 {
                     r32 res = ud->mb->mi->dispatch_BOOTROM
                     (
@@ -644,7 +648,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         //TODO: wtf is this even
         r8* __restrict rv = (r8* __restrict)(size_t)&ud->ppu->OAM[addr & 0xFF];
         
-        if(type)
+        if(MB_TYPE_IS_WRITE(type))
         {
             *rv = data;
             return data;
@@ -792,11 +796,11 @@ PGB_FUNC r32 pgf_cb_BOOTROM(void* userdata, r32 addr, r32 data, word type)
     
     const r8* __restrict ptr = (const r8* __restrict)ud->mb->mi->userdata_BOOTROM;
     
-    if(type == MI_LONGDISPATCH_READ_8 && ptr)
+    if(type == MI_LONGDISPATCH_READ_8 && ptr != NULL)
     {
         return ptr[addr];
     }
-    else if(type == MI_LONGDISPATCH_READ_32 && ptr)
+    else if(type == MI_LONGDISPATCH_READ_32 && ptr != NULL)
     {
         return *(const r32* __restrict)&ptr[addr];
     }
@@ -821,7 +825,7 @@ PGB_FUNC const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
     
     var isnew = 0;
     struct lru_slot* slot = lru_get_write(dispatch_ROM_Bank->lru, addr, bank, &isnew);
-    if(slot)
+    if(slot != NULL)
     {
         if(isnew)
         {
@@ -842,6 +846,6 @@ PGB_FUNC const r8* pgf_cb_ROM_LRU_(void* userdata, word addr, word bank)
         return slot->data;
     }
     
-    return 0;
+    return NULL;
 }
 #endif

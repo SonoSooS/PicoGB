@@ -15,6 +15,27 @@
 
 #define MB_FMC_MODE_MAX 4
 
+
+#define MB_FLAG_Z 0x80
+#define MB_FLAG_N 0x40
+#define MB_FLAG_H 0x20
+#define MB_FLAG_C 0x10
+#define MB_FLAG_BITS 0xF0
+
+#define MB_CC_NZ 0
+#define MB_CC_Z 1
+#define MB_CC_NC 2
+#define MB_CC_C 3
+
+// Nothing cares about exec, works same as read
+#define MB_TYPE_READ 0
+#define MB_TYPE_WRITE 1
+#define MB_TYPE_IS_READ(type) (!(type))
+#define MB_TYPE_IS_WRITE(type) (!!(type))
+
+#define MB_DATA_DONTCARE 0
+
+
 struct mb_state
 {
     union

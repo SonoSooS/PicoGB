@@ -19,6 +19,11 @@
 #define COMPILER_LIKELY(cond) __builtin_expect(cond, 1)
 
 
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+
 #if PPU_IS_MONOCHROME
 typedef unsigned char pixel_t;
 #elif PPU_MODE == 4

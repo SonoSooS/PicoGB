@@ -7,9 +7,9 @@ PGB_FUNC void micache_invalidate(struct mb_mi_cache* __restrict mic)
     word i = 0;
     do
     {
-        mic->mc_execute[i] = 0;
-        mic->mc_write[i] = 0;
-        mic->mc_read[i] = 0;
+        mic->mc_execute[i] = NULL;
+        mic->mc_write[i] = NULL;
+        mic->mc_read[i] = NULL;
     }
     while(++i < counts);
 }
@@ -21,9 +21,9 @@ PGB_FUNC void micache_invalidate_range(struct mb_mi_cache* __restrict mic, word 
     word i = MICACHE_R_VALUE(start);
     do
     {
-        mic->mc_execute[i] = 0;
-        mic->mc_write[i] = 0;
-        mic->mc_read[i] = 0;
+        mic->mc_execute[i] = NULL;
+        mic->mc_write[i] = NULL;
+        mic->mc_read[i] = NULL;
     }
     while(++i <= ends);
 }
