@@ -967,11 +967,42 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
     }
     #endif
     
+    #if 1
+    if(IR >= 0xC0)
+    {
+        if(IR == 0xF0)
+        {
+            data_wide = 0xFF00 | mch_memory_fetch_PC_op_1(mb);
+            goto instr_360;
+        }
+        else if(IR == 0xFA)
+        {
+            data_wide = mch_memory_fetch_PC_op_2(mb);
+            goto instr_372;
+        }
+        else
+            goto IR_case_3;
+    }
+    else if(IR >= 0x80)
+        goto IR_case_2;
+    else if(IR < 0x40)
+    {
+        if(IR_F_COL == 0)
+            goto instr_0x0;
+        else
+            goto IR_case_0;
+    }
+    else
+        goto IR_case_1;
+    #endif
+    
     switch((IR >> 6) & 3)
     {
+        IR_case_0:
         case 0: // Top bullshit
             switch(IR_column)
             {
+                instr_0x0:
                 case 0: // whatever
                     if(0)
                     {
@@ -1330,8 +1361,9 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
             }
             return 0;
         
+        IR_case_1:
         case 1: // MOV
-            if(IR != 0x76)
+            if(COMPILER_LIKELY(IR != 0x76))
             {
                 instr_MOV:
                 {
@@ -1374,6 +1406,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 goto generic_fetch_halt;
             }
         
+        IR_case_2:
         case 2: // ALU r8
         {
             // A is always the src and dst, thank fuck
@@ -1508,6 +1541,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
             goto generic_fetch;
         }
         
+        IR_case_3:
         case 3: // Bottom bullshit
             switch(IR_column)
             {
