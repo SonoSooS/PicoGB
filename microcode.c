@@ -309,6 +309,11 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
     return mch_resolve_mic_execute_slow(mb, addr);
 }
 
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __restrict mch_resolve_mic_execute_noinline(self mb, word addr)
+{
+    return mch_resolve_mic_execute(mb, addr);
+}
+
 PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_resolve_mic_execute_slow_deref(self mb, word addr)
 {
     return *mch_resolve_mic_execute_slow(mb, addr);
@@ -439,7 +444,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_1_noin
     return mch_memory_fetch_decode_1(mb, addr);
 }
 
-PGB_FUNC static word mch_memory_fetch_decode_2_slow(self mb, word addr)
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_fetch_decode_2_slow(self mb, word addr)
 {
     word addr2 = (addr + 1) & 0xFFFF;
     
@@ -452,42 +457,57 @@ PGB_FUNC static word mch_memory_fetch_decode_2_slow(self mb, word addr)
     return res;
 }
 
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_resolve_mic_execute_deref_2_HRAM(self mb, word addr)
+{
+    addr = (addr - 0x80) & 0xFF;
+    
+    const volatile r8* __restrict ptr = &mb->mi->HRAM[addr];
+    
+    var nres = ptr[0];
+    nres |= ptr[1] << 8;
+    
+    return nres;
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_resolve_mic_execute_deref_2(self mb, word addr)
+{
+    // This has to be volatile, otherwise
+    //  an LDRH is emitted, which is no cool, as
+    //  the pointer will very likely be not aligned.
+    // This sadly wastes precious CPU cycles,
+    //  but it's necessary to avoid unaligned data abort.
+    const volatile r8* __restrict ptr = mch_resolve_mic_execute(mb, addr);
+    
+    word nres = ptr[0];
+    nres |= ptr[1] << 8;
+    
+    return nres;
+}
+
 // Fetch two bytes as part of an instruction
-PGB_FUNC ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_2(self mb, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_2(self mb, word addr)
 {
 #if !CONFIG_MIC_CACHE_BYPASS
     
-    if(addr < 0xFE00) // yeah, this is an off-by-one error, and I don't care
+    if(COMPILER_LIKELY(addr < 0xFE00)) // yeah, this is an off-by-one error, and I don't care
     {
-        word addr2 = (addr + 1) & 0xFFFF;
+        //word r1 = MICACHE_R_VALUE(addr);
+        //word r2 = MICACHE_R_VALUE(addr + 1);
+        //if(COMPILER_LIKELY(r1 == r2))
         
-        word r1 = MICACHE_R_VALUE(addr);
-        word r2 = MICACHE_R_VALUE(addr2);
-        if(r1 == r2)
+        word tmp = ~addr;
+        COMPILER_VARIABLE_BARRIER(tmp);
+        tmp &= MICACHE_R_SEL;
+        COMPILER_VARIABLE_BARRIER(tmp);
+        
+        if(COMPILER_LIKELY(tmp)) // same as above commented code
         {
-            // This has to be volatile, otherwise
-            //  an LDRH is emitted, which is no cool, as
-            //  the pointer will very likely be not aligned.
-            // This sadly wastes precious CPU cycles,
-            //  but it's necessary to avoid unaligned data abort.
-            const volatile r8* __restrict ptr = mch_resolve_mic_execute(mb, addr);
-            
-            var nres = *(ptr++);
-            nres |= *(ptr++) << 8;
-            
-            return nres;
+            return mch_resolve_mic_execute_deref_2(mb, addr);
         }
     }
-    else if((addr >= 0xFF80) && (addr < 0xFFFE))
+    else if(addr >= 0xFF80) // This is off by 2, but let's be honest, if this triggers, we're already lost
     {
-        addr -= 0xFF80;
-        
-        const volatile r8* __restrict ptr = &mb->mi->HRAM[addr];
-        
-        var nres = *(ptr++);
-        nres |= *(ptr++) << 8;
-        
-        return nres;
+        return mch_resolve_mic_execute_deref_2_HRAM(mb, addr);
     }
 #endif
     
