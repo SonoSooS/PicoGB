@@ -43,7 +43,7 @@ PGB_FUNC static inline const r8* __restrict mch_resolve_mic_bank_internal(const 
 #endif
 
 // Uncached resolve aligned readable const memory area, based on address
-PGB_FUNC ATTR_FORCE_NOINLINE static const r8* __restrict mch_resolve_mic_r_direct_read(const self mb, word r_addr)
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __restrict mch_resolve_mic_r_direct_read(const self mb, word r_addr)
 {
     USE_MI;
     
@@ -111,7 +111,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE static const r8* __restrict mch_resolve_mic_r_direc
     }
 }
 
-PGB_FUNC ATTR_FORCE_NOINLINE static r8* __restrict mch_resolve_mic_r_direct_write(const self mb, word r_addr)
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static r8* __restrict mch_resolve_mic_r_direct_write(const self mb, word r_addr)
 {
     USE_MI;
     
@@ -163,28 +163,61 @@ PGB_FUNC ATTR_FORCE_NOINLINE static r8* __restrict mch_resolve_mic_r_direct_writ
 
 #pragma region Resolve (read)
 
-PGB_FUNC ATTR_HOT static inline const r8* __restrict mch_resolve_mic_read(self mb, word addr)
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __restrict mch_resolve_mic_read_slow(self mb, word addr)
 {
-    USE_MIC;
-    
-    var r_addr = MICACHE_R_VALUE(addr);
-    
     const r8* __restrict ptr;
     
-#if !CONFIG_MIC_CACHE_BYPASS
-    ptr = mic->mc_read[r_addr];
-    if(COMPILER_LIKELY(ptr != NULL))
-        return &ptr[addr & MICACHE_R_SEL];
-#endif
+    var r_addr = MICACHE_R_VALUE(addr);
     
     ptr = mch_resolve_mic_r_direct_read(mb, r_addr);
     if(COMPILER_LIKELY(ptr != NULL))
     {
+#if !CONFIG_MIC_CACHE_BYPASS
+        USE_MIC;
         mic->mc_read[r_addr] = ptr;
+#endif
+        
         return &ptr[addr & MICACHE_R_SEL];
     }
     
     return NULL;
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inline const r8* __restrict mch_resolve_mic_read(self mb, word addr)
+{
+    
+#if !CONFIG_MIC_CACHE_BYPASS
+    var r_addr = MICACHE_R_VALUE(addr);
+    
+    const r8* __restrict ptr;
+    
+    ptr = mb->micache.mc_read[r_addr];
+    if(COMPILER_LIKELY(ptr != NULL))
+        return &ptr[addr & MICACHE_R_SEL];
+#endif
+    
+    return mch_resolve_mic_read_slow(mb, addr);
+}
+
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_resolve_mic_read_slow_deref(self mb, word addr)
+{
+    return *mch_resolve_mic_read_slow(mb, addr);
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inline word mch_resolve_mic_read_deref(self mb, word addr)
+{
+#if !CONFIG_MIC_CACHE_BYPASS
+    var r_addr = MICACHE_R_VALUE(addr);
+    
+    const r8* __restrict ptr;
+    
+    ptr = mb->micache.mc_read[r_addr];
+    if(COMPILER_LIKELY(ptr != NULL))
+        return ptr[addr & MICACHE_R_SEL];
+    else
+#endif
+    
+    return mch_resolve_mic_read_slow_deref(mb, addr);
 }
 
 #pragma endregion
@@ -209,7 +242,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static void mch_res
     *ptr = data;
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("Os"))) static void mch_resolve_write_deref(r8* __restrict ptr, word addr, word data)
+PGB_FUNC ATTR_HOT __attribute__((optimize("Os"))) static void mch_resolve_write_deref(r8* __restrict ptr, word addr, word data)
 {
     addr &= MICACHE_R_SEL;
     COMPILER_VARIABLE_BARRIER(addr);
@@ -356,16 +389,12 @@ PGB_FUNC ATTR_FORCE_NOINLINE static void mch_memory_dispatch_write_ROM(const sel
 #pragma region Dispatch
 
 // Handle read from memory by microcode, including ECHO RAM
-PGB_FUNC ATTR_HOT __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_(self mb, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_dispatch_read_(self mb, word addr)
 {
     if(COMPILER_LIKELY(addr < 0xFE00))
-    {
-        const r8* __restrict ptr;
-        ptr = mch_resolve_mic_read(mb, addr);
-        return *ptr;
-    }
-    
-    return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
+        return mch_resolve_mic_read_deref(mb, addr);
+    else
+        return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
 #if CONFIG_DBG
