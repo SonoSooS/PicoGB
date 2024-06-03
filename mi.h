@@ -42,7 +42,11 @@ struct mb_mi_cache
 
 struct mi_dispatch
 {
+#if CONFIG_USE_FLAT_ROM
+    const r8* __restrict ROM;
+#else
     const r8* __restrict const * __restrict ROM;
+#endif
     r8* __restrict WRAM;
     r8* __restrict VRAM;
     r8* __restrict SRAM;

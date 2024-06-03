@@ -633,7 +633,10 @@ static struct mi_dispatch dis;
 static struct mb_state mb;
 static struct ppu_t pp;
 static struct apu_t apu;
+
+#if !CONFIG_USE_FLAT_ROM
 static const r8* __restrict rommap[512];
+#endif
 
 static pixel_t* __restrict fb_lines[145];
 
@@ -692,7 +695,10 @@ int main(int argc, char** argv)
     audbuf = malloc(sizeof(*audbuf) * apu.outbuf_size);
     apu.outbuf = audbuf;
     
+    #if !CONFIG_USE_FLAT_ROM
     memset((void*)&rommap[0], 0, sizeof(rommap));
+    #endif
+    
     pixel_t* __restrict framebuffer = malloc(sizeof(pixel_t) * 256 * 145);
     memset(framebuffer, 0, sizeof(pixel_t) * 256 * 145);
     for(i = 0; i != 145; ++i)
@@ -776,11 +782,17 @@ int main(int argc, char** argv)
             fs = ff;
         }
         
+        #if !CONFIG_USE_FLAT_ROM
         for(i = 0; i != (fs >> 14); i++)
             rommap[i] = &img[i << 14];
+        #endif
         
     #if !CONFIG_ENABLE_LRU
-        dis.ROM = rommap;
+        #if CONFIG_USE_FLAT_ROM
+            dis.ROM = img;
+        #else
+            dis.ROM = rommap;
+        #endif
     #else
         dis.ROM = 0;
         dis.dispatch_ROM_Bank = cb_ROM_LRU;
@@ -800,7 +812,7 @@ int main(int argc, char** argv)
         
         mb.mi = &dis;
         micache_invalidate(&mb.micache);
-        mi_init_params_from_header(mb.mi, rommap[0]);
+        mi_init_params_from_header(mb.mi, img);
         
         mb.IE = 0;
         mb.IF = 0;
@@ -929,7 +941,7 @@ int main(int argc, char** argv)
                 fread(&dis.WRAM[0x6000], 256, 1, f);
                 fclose(f);
                 
-                memcpy(&dis.WRAM[0x6100], &dis.ROM[0][0x100], 0x50);
+                memcpy(&dis.WRAM[0x6100], &img[0x100], 0x50);
                 
                 mb.micache.mc_read[0] = &dis.WRAM[0x6000]; 
                 mb.micache.mc_execute[0] = &dis.WRAM[0x6000]; 

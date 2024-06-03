@@ -29,6 +29,8 @@
 //#define CONFIG_APU_MONO
 #define CONFIG_APU_N_PER_TICK 8
 #define CONFIG_APU_N_BUFSIZE 32768
+//#define CONFIG_ENABLE_LRU
+//#define CONFIG_USE_FLAT_ROM
 //#define CONFIG_PPU_ACTION_ON_START
 
 
@@ -199,6 +201,13 @@
 #else
 #undef CONFIG_ENABLE_LRU
 #define CONFIG_ENABLE_LRU 1
+#endif
+
+#ifndef CONFIG_USE_FLAT_ROM
+#define CONFIG_USE_FLAT_ROM 0
+#else
+#undef CONFIG_USE_FLAT_ROM
+#define CONFIG_USE_FLAT_ROM 1
 #endif
 
 #ifndef CONFIG_PPU_ACTION_ON_START

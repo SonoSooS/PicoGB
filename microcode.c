@@ -58,18 +58,29 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
         {
             if(r_addr < MICACHE_R_VALUE(0x4000))
             {
+            #if CONFIG_USE_FLAT_ROM
+                ret = &mi->ROM[0];
+                return &ret[r_addr << MICACHE_R_BITS];
+            #else
                 ret = mi->ROM[0];
                 if(ret != NULL)
                     return &ret[r_addr << MICACHE_R_BITS];
+            #endif
             }
             else
             {
+            #if CONFIG_USE_FLAT_ROM
+                r_addr &= MICACHE_R_VALUE(0x3FFF);
+                ret = &mi->ROM[mi->BANK_ROM << 14];
+                return &ret[r_addr << MICACHE_R_BITS];
+            #else
                 ret = mi->ROM[mi->BANK_ROM];
                 if(ret != NULL)
                 {
                     r_addr &= MICACHE_R_VALUE(0x3FFF);
                     return &ret[r_addr << MICACHE_R_BITS];
                 }
+            #endif
             }
         }
         

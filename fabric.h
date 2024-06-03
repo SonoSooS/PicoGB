@@ -75,9 +75,14 @@ static inline const r8* pgf_resolve_ROM_internal(void* userdata, word addr, word
     if(ud->mb->mi->ROM != NULL)
 #endif
     {
+#if CONFIG_USE_FLAT_ROM
+        res = &ud->mb->mi->ROM[bank * 0x4000];
+        return &res[addr & 0x3FFF];
+#else
         res = ud->mb->mi->ROM[bank];
         if(res != NULL)
             return &res[addr & 0x3FFF];
+#endif
     }
     
 #if CONFIG_ENABLE_LRU
