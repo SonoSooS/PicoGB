@@ -1035,6 +1035,9 @@ int main(int argc, char** argv)
     #endif
     
     #if CONFIG_TAS
+    LONGLONG time_start = 0;
+    NtQuerySystemTime(&time_start);
+    
     FILE* ftas = fopen("TAS.bin",
     #if CONFIG_TAS == 2
         "rb"
@@ -1328,6 +1331,12 @@ int main(int argc, char** argv)
 #if CONFIG_TAS
 kil_end:
     fclose(ftas);
+    
+    LONGLONG time_end = 0;
+    NtQuerySystemTime(&time_end);
+    
+    printf("Time took: %lld\n", time_end - time_start);
+    
 #endif
     if(wnd)
     {
