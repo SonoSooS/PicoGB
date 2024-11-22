@@ -429,33 +429,63 @@ __attribute__((no_instrument_function)) static LRESULT CALLBACK WindowProc(HWND 
             nch = sprintf(sbuf, "ptr: %16llX / data: %02X\n", ud->ppu->OAM, ud->_debug);
             TextOutA(dc, 0, 0, sbuf, nch);
             
-            var i;
-            const r8* __restrict oam = &ud->ppu->OAM[0];
-            for(i = 0; i != 10; i++)
+            word i;
+            for(i = 0; i < 4; i++)
             {
-                nch = sprintf(sbuf, "%02X: %02X %02X %02X %02X  %02X %02X %02X %02X  %02X %02X %02X %02X  %02X %02X %02X %02X\n",
-                    i << 4,
-                    oam[0],
-                    oam[1],
-                    oam[2],
-                    oam[3],
-                    oam[4],
-                    oam[5],
-                    oam[6],
-                    oam[7],
-                    oam[8],
-                    oam[9],
-                    oam[10],
-                    oam[11],
-                    oam[12],
-                    oam[13],
-                    oam[14],
-                    oam[15]
-                    );
+                const struct apu_ch_t* __restrict ch = &ud->apu->ch[i];
                 
-                TextOutA(dc, 0, (i + 1) << 4, sbuf, nch);
+                if(i < 2)
+                nch = sprintf(sbuf, "CH%u: %2ux %2u - %03X %2u%c=%1u %02X %02X - %5u %2u",
+                    i + 1,
+                    ch->vol,
+                    ch->raw_out,
+                    
+                    ((ch->NR_RAW[4] & 7) << 8) | ch->NR_RAW[3],
+                    ch->NR_RAW[2] >> 4,
+                    (ch->NR_RAW[2] & 8) ? '+' : '-',
+                    ch->NR_RAW[2] & 7,
+                    
+                    ch->NR_RAW[1],
+                    ch->NR_RAW[0],
+                    
+                    ch->ctr,
+                    ch->sample_no
+                );
+                else if(i == 2)
+                nch = sprintf(sbuf, "CH%u: %2u/  %u - %03X       %02X %02X - %5u %2u",
+                    i + 1,
+                    ch->raw_out,
+                    ((1 << ((ch->NR_RAW[2] >> 5) & 3)) >> 1),
+                    
+                    ((ch->NR_RAW[4] & 7) << 8) | ch->NR_RAW[3],
+                    ch->NR_RAW[1],
+                    ch->NR_RAW[0],
+                    
+                    ch->ctr,
+                    ch->sample_no
+                );
+                else
+                nch = sprintf(sbuf, "CH%u: %2ux %2u -     %2u%c=%1u %02X %02X - %5u %2u - >>%u /%u %c",
+                    i + 1,
+                    ch->vol,
+                    ch->raw_out,
+                    
+                    ch->NR_RAW[2] >> 4,
+                    (ch->NR_RAW[2] & 8) ? '+' : '-',
+                    ch->NR_RAW[2] & 7,
+                    
+                    ch->NR_RAW[1],
+                    ch->NR_RAW[0],
+                    
+                    ch->ctr,
+                    ch->sample_no,
+                    
+                    ch->NR_RAW[3] >> 4,
+                    ch->NR_RAW[3] & 7,
+                    (ch->NR_RAW[3] & 8) ? 'H' : 's'
+                );
                 
-                oam += 16;
+                TextOutA(dc, 0, (i + 2) * 16, sbuf, nch);
             }
             
             SelectObject(dc, hOldFont);
