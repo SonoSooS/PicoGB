@@ -29,9 +29,9 @@ static const var patterns[4] PGB_DATA =
 
 #pragma region Helper functions
 
-static inline word apuchi_get_reload(const struct apu_ch_t* __restrict ch)
+static inline void apuchi_clear_trigger(struct apu_ch_t* __restrict ch)
 {
-    return (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8))) & 0x7FF;
+    ch->NR_RAW[4] = ch->NR_RAW[4] & 0x7F;
 }
 
 static inline wbool apuchi_is_trigger(const struct apu_ch_t* __restrict ch)
@@ -39,47 +39,47 @@ static inline wbool apuchi_is_trigger(const struct apu_ch_t* __restrict ch)
     return ch->NR_RAW[4] & 0x80;
 }
 
-static inline void apuchi_clear_trigger(struct apu_ch_t* __restrict ch)
+static inline word apuchi_get_reload(const struct apu_ch_t* __restrict ch)
 {
-    ch->NR_RAW[4] = ch->NR_RAW[4] & 0x7F;
+    return (~(ch->NR_RAW[3] | (ch->NR_RAW[4] << 8))) & 0x7FF;
 }
 
-static inline word apuchi_get_ch1_sample_type(struct apu_ch_t* __restrict ch)
+static inline word apuchi_get_ch1_sample_type(const struct apu_ch_t* __restrict ch)
 {
     return (ch->NR_RAW[1] >> 6) & 3;
 }
 
-static inline word apuchi_get_ch_length(struct apu_ch_t* __restrict ch)
+static inline word apuchi_get_ch_length(const struct apu_ch_t* __restrict ch)
 {
     return (~(ch->NR_RAW[1])) & 0x3F;
 }
 
-static inline word apuchi_get_ch3_length(struct apu_ch_t* __restrict ch)
+static inline word apuchi_get_ch3_length(const struct apu_ch_t* __restrict ch)
 {
     return (~(ch->NR_RAW[1])) & 0xFF;
 }
 
-static inline word apuchi_get_volsweep_ctr(struct apu_ch_t* __restrict ch)
+static inline word apuchi_get_volsweep_ctr(const struct apu_ch_t* __restrict ch)
 {
     return ch->NR_RAW[2] & 7;
 }
 
-static inline wbool apuchi_get_volsweep_is_increase(struct apu_ch_t* __restrict ch)
+static inline wbool apuchi_get_volsweep_is_increase(const struct apu_ch_t* __restrict ch)
 {
     return (ch->NR_RAW[2] >> 3) & 1;
 }
 
-static inline word apuchi_get_volsweep_volume(struct apu_ch_t* __restrict ch)
+static inline word apuchi_get_volsweep_volume(const struct apu_ch_t* __restrict ch)
 {
     return (ch->NR_RAW[2] >> 4) & 0xF;
 }
 
-static inline wbool apuchi_get_dac_ch(struct apu_ch_t* __restrict ch)
+static inline wbool apuchi_get_dac_ch(const struct apu_ch_t* __restrict ch)
 {
     return ch->NR_RAW[2] & 0xF8;
 }
 
-static inline wbool apuchi_get_dac_ch3(struct apu_ch_t* __restrict ch)
+static inline wbool apuchi_get_dac_ch3(const struct apu_ch_t* __restrict ch)
 {
     return ch->NR_RAW[0] & 0x80;
 }
