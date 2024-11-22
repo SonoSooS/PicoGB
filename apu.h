@@ -13,14 +13,15 @@
 struct apu_ch_t
 {
     r16 ctr;
-    r16 _unused2;
+    r16 raw;
     r8 NR_RAW[5];
-    r8 _unused[1];
+    r8 raw_out;
     r8 sample_no;
     r8 sweep_ctr;
     r8 length_ctr;
     r8 vol;
-    r16 raw;
+    r8 dirty;
+    r8 is_on;
 };
 
 struct apu_t
