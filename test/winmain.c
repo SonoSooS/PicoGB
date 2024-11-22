@@ -132,17 +132,17 @@ static void mmidi_reset(void)
 
 static void dis_alloc(struct mi_dispatch* __restrict dis)
 {
-    dis->WRAM = malloc(0x1000 * 8);
-    dis->VRAM = malloc(0x2000 * 2);
-    dis->SRAM = malloc(0x2000 * 16);
+    dis->WRAM = calloc(0x1000 * 8, 1);
+    dis->VRAM = calloc(0x2000 * 2, 1);
+    dis->SRAM = calloc(0x2000 * 16, 1);
     
     dis->BANK_ROM = 1;
     dis->BANK_WRAM = 1;
     dis->BANK_VRAM = 0;
     dis->BANK_SRAM = 0;
     
-    dis->HRAM = malloc(0x100);
-    dis->OAM = malloc(0x100);
+    dis->HRAM = calloc(0x100, 1);
+    dis->OAM = calloc(0x100, 1);
 }
 
 static void regdump(const struct mb_state* __restrict mb)
