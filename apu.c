@@ -162,7 +162,7 @@ static void apu_init_ch(apu_t* __restrict pp, word _ch)
         
         if(_ch == 3)
         {
-            ch->sample_no = 0;
+            ch->sample_no = 1;
             ch->raw = 0;
         }
         
@@ -426,33 +426,35 @@ static sword apuch_tick_ch3(apu_t* __restrict pp, word _ch)
 
 static const r8 APUCH_CH4_MULDIV[8] PGB_DATA =
 {
-    1, 2, 4, 6, 8, 10, 12, 14
+    2, 4, 8, 12, 16, 20, 24, 28
 };
 
 static sword apuch_tick_ch4(apu_t* __restrict pp, word _ch)
 {
     struct apu_ch_t* __restrict ch = &pp->ch[_ch];
     
-    if(!((ch->ctr)++ & ((1 << ((ch->NR_RAW[3] >> 4) + 1)) - 1)))
+    if(!((ch->ctr)++ & ((1 << (ch->NR_RAW[3] >> 4)) - 1)))
     {
         if(--ch->sample_no)
             ;
         else
         {
+            ch->ctr = 0;
+            
             ch->sample_no = APUCH_CH4_MULDIV[(ch->NR_RAW[3] & 7)];
             
-            r16 rs = ch->raw;
-            r16 ns = (((rs >> 1) ^ ~rs) & 1);
-            
+            r16 m = (1 << 15);
             if(ch->NR_RAW[3] & 8)
-            {
-                ns = (ns << 7) | (ns << 15);
-                ch->raw = (ch->raw & 0x3FBF) | ns;
-            }
+                m |= (1 << 7);
+            
+            r16 rs = ch->raw;
+            r16 ns = rs >> 1;
+            
+            if((ns ^ rs) & 1)
+                ns &= ~m;
             else
-            {
-                ch->raw = (((rs >> 1) ^ ~rs) << 14) | ((rs >> 1) & 0x3FFF);
-            }
+                ns |= m;
+            ch->raw = ns;
         }
     }
     
