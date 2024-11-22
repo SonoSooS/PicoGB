@@ -1093,6 +1093,10 @@ int main(int argc, char** argv)
     
     var ppirq_tmp = 0;
     
+#ifdef DOUBLESPEED
+    word cycle_error = 0;
+#endif
+    
     for(;;)
     {
         int lol = 0;
@@ -1201,9 +1205,9 @@ int main(int argc, char** argv)
         }
         else
         {
-            cycles = totalcycles >> 2;
-            if(!cycles)
-                cycles = 1;
+            cycle_error += totalcycles;
+            cycles = cycle_error >> 1;
+            cycle_error -= cycles << 1;
         }
 #endif
         
