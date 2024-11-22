@@ -359,8 +359,8 @@ static void apuch_update_volenv(struct apu_ch_t* __restrict ch)
     
     if(ch->sweep_ctr)
     {
-        --(ch->sweep_ctr);
-        return;
+        if(--(ch->sweep_ctr));
+            return;
     }
     
     ch->sweep_ctr = apuchi_get_volsweep_ctr(ch);
