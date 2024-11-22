@@ -443,9 +443,9 @@ static sword apuch_tick_ch4(apu_t* __restrict pp, word _ch)
             
             ch->sample_no = APUCH_CH4_MULDIV[(ch->NR_RAW[3] & 7)];
             
-            r16 m = (1 << 15);
+            r16 m = (1 << 14);
             if(ch->NR_RAW[3] & 8)
-                m |= (1 << 7);
+                m |= (1 << 6);
             
             r16 rs = ch->raw;
             r16 ns = rs >> 1;
