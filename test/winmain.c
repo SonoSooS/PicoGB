@@ -1292,8 +1292,8 @@ int main(int argc, char** argv)
             if(ppirq)
             {
                 //printf("  - IF_SCHED %02X\n", ppirq);
-                mb.IF |= ppirq;
-                ppirq_tmp |= ppirq & 0;
+                //mb.IF |= ppirq;
+                ppirq_tmp |= ppirq;// & 0;
             }
             
             if(pp._redrawed)
