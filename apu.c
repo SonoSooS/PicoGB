@@ -673,10 +673,10 @@ void apu_render(apu_t* __restrict pp, s16* outbuf, word ncounts)
 #endif
     }
     
-    if(!(pp->ch[0].vol)) pp->MASTER_CFG &= 0xFFFEFFFF;
-    if(!(pp->ch[1].vol)) pp->MASTER_CFG &= 0xFFFDFFFF;
-    if(!(pp->ch[2].vol)) pp->MASTER_CFG &= 0xFFFBFFFF;
-    if(!(pp->ch[3].vol)) pp->MASTER_CFG &= 0xFFF7FFFF;
+    if(!(pp->ch[0].is_on)) pp->MASTER_CFG &= 0xFFFEFFFF;
+    if(!(pp->ch[1].is_on)) pp->MASTER_CFG &= 0xFFFDFFFF;
+    if(!(pp->ch[2].is_on)) pp->MASTER_CFG &= 0xFFFBFFFF;
+    if(!(pp->ch[3].is_on)) pp->MASTER_CFG &= 0xFFF7FFFF;
 }
 
 void apu_tick_internal_internals(apu_t* __restrict pp)
