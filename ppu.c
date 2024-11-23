@@ -10,8 +10,8 @@
 
 #if !CONFIG_IS_CGB
 #define IS_CGB 0
-#elif CONFIG_FORCE_ENABLE_CGB
-#define IS_CGB 1
+//#elif CONFIG_FORCE_ENABLE_CGB
+//#define IS_CGB 1
 #else
 #define IS_CGB (pp->is_cgb)
 #endif

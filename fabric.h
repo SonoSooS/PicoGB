@@ -25,11 +25,13 @@ struct pgf_userdata_t
     var SB;
     var SC;
     
-#if CONFIG_FORCE_ENABLE_CGB
+#if CONFIG_IS_CGB
     var GDMA_SRC;
     var GDMA_DST;
     var GDMA_CNT;
+    
     var CGB_SPEED;
+    var CGB_MODE;
 #endif
 };
 

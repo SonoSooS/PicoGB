@@ -414,7 +414,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static wor
 }
 
 #if CONFIG_DBG
-PGB_FUNC static word mch_memory_dispatch_read(self, word addr)
+PGB_FUNC static word mch_memory_dispatch_read(self mb, word addr)
 {
     DBGF("- /RD %04X -> ", addr);
     word res = mch_memory_dispatch_read_(mb, addr);
@@ -1112,9 +1112,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     {
                         instr_00:
                         case 0: // NOP
+                            goto generic_fetch;
                         instr_10:
                         case 2: // STOP
-                            goto generic_fetch; // STOP is just bugged NOP, lol
+                            goto generic_fetch_stop; // STOP is just bugged NOP, lol
                         
                         instr_08:
                         case 1: // LD a16, SP
@@ -1986,17 +1987,30 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
     
     generic_fetch_halt:
     {
-        //mb->HALTING = !(mb->IE & mb->IF & 0x1F);
-        mb->HALTING = 1;
-        
-        //var PC = mb->PC;
         mb->IR.raw = mch_memory_fetch_PC(mb);
-        /*
-        mb->PC = PC;
+        
+        mb->IMM.high = 0x76;
+        
+        mb->HALTING = !(mb->IE & mb->IF);
         if(mb->HALTING)
-            mb->IR.raw = 0x00; // NOP
-        */
-        return ncycles + 1;
+        {
+            //mb->IR.raw = 0; // NOP
+            return 1;
+        }
+    }
+        
+    generic_fetch_stop:
+    {
+        mb->IR.raw = mch_memory_fetch_PC(mb);
+        
+        mb->IMM.high = 0x10;
+        
+        mb->HALTING = 1;
+        if(mb->HALTING)
+        {
+            mb->IR.raw = 0; // NOP
+            return 1;
+        }
     }
     
     handle_cb:

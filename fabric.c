@@ -403,10 +403,43 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         else if(reg < 0x68) // misc and CGB garbage
         {
-            if(reg == 0x4D)
+            if(reg == 0x4C)
             {
             #if CONFIG_FORCE_ENABLE_CGB
-                
+                if(MB_TYPE_IS_WRITE(type))
+                {
+                    if(!(ud->CGB_MODE & 2))
+                    {
+                        ud->CGB_MODE = (ud->CGB_MODE & 2) | (~2 & data);
+                        ud->ppu->is_cgb = (data & 12) != 4;
+                    }
+                    return data;
+                }
+                else
+                {
+                    return ud->CGB_MODE | 0xF2;
+                }
+            #endif
+            }
+            else if(reg == 0x4D)
+            {
+            #if CONFIG_FORCE_ENABLE_CGB
+                if(MB_TYPE_IS_WRITE(type))
+                {
+                    if(ud->ppu->is_cgb)
+                    {
+                        ud->CGB_SPEED = (ud->CGB_SPEED & 0xFE) | (data & 1);
+                        return data;
+                    }
+                }
+                else if(ud->ppu->is_cgb)
+                {
+                    return ud->CGB_SPEED | 0x7E;
+                }
+                else
+                {
+                    return 0xFF;
+                }
             #endif
             }
             else if(reg == 0x4F)
@@ -438,6 +471,10 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                     if(ud->mb->mi->dispatch_BOOTROM != NULL)
                         ud->mb->mi->dispatch_BOOTROM(userdata, 0, 0, MI_LONGDISPATCH_BOOTROM_LOCK);
                     ud->mb->mi->dispatch_BOOTROM = NULL; // disable iboot interface
+                #endif
+                    
+                #if CONFIG_IS_CGB
+                    ud->CGB_MODE |= 2; // Repurpose unwritable bit1
                 #endif
                     
                     return data;

@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+#include <windows.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +16,7 @@
 #include "../lru.h"
 
 //#define DEBUGFRAME
-//#define DOUBLESPEED
+#define DOUBLESPEED
 
 #ifdef DEBUGFRAME
 #define FRAME_WIDTH 256
@@ -628,7 +628,7 @@ static void dbg_dump(struct mb_state* __restrict mb)
     
     printf
     (
-        "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X, POSTFLAG:%02X\n",
+        "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X, POSTFLAG:%02X HALTING:%02X%02X\n",
         mb->reg.A,
         flag,
         mb->reg.B,
@@ -640,7 +640,9 @@ static void dbg_dump(struct mb_state* __restrict mb)
         mb->SP,
         PC,
         mb->IR.low,
-        mb->reg.F
+        mb->reg.F,
+        mb->HALTING,
+        mb->IMM.high
     );
     
     mb->reg.F = flag;
@@ -930,23 +932,20 @@ int main(int argc, char** argv)
             
             FILE* f = 0;
             #if !CONFIG_NOBOOTMEME
-            //f = fopen("../testrom_cgb.gbc", "rb");
-            //#error no
+            f = fopen("../../testrom_cgb.gbc", "rb");
             #endif
             if(f)
             {
                 //TODO: bad memory leak
                 r8* asd = malloc(0x1000);
                 
-                fread(asd, 0x900, 1, f);
+                fread(asd, 0x1000, 1, f);
                 fclose(f);
                 
-                //memcpy(&asd[0x100], &dis.ROM[0x100], 0x50);
+                memcpy(&asd[0x100], &img[0x100], 0x50);
                 
-                //mb.micache.mc_read = asd;
-                //mb.micache.mc_execute = asd;
-                //mb.micache.r_read = 0;
-                //mb.micache.r_execute = 0;
+                mb.micache.mc_read[0] = asd;
+                mb.micache.mc_execute[0] = asd;
                 
                 mb.PC = 0;
                 mb.DIV = 0;
@@ -963,8 +962,7 @@ int main(int argc, char** argv)
         {
             FILE* f = 0;
             #if !CONFIG_NOBOOTMEME
-            f = fopen("../testrom.gb", "rb");
-            //#error no
+            f = fopen("../../testrom.gb", "rb");
             #endif
             if(f)
             {
@@ -973,12 +971,8 @@ int main(int argc, char** argv)
                 
                 memcpy(&dis.WRAM[0x6100], &img[0x100], 0x50);
                 
-                mb.micache.mc_read[0] = &dis.WRAM[0x6000]; 
-                mb.micache.mc_execute[0] = &dis.WRAM[0x6000]; 
-                //mb.micache.mc_read = &dis.WRAM[0x6000];
-                //mb.micache.mc_execute = &dis.WRAM[0x6000];
-                //mb.micache.r_read = 0;
-                //mb.micache.r_execute = 0;
+                mb.micache.mc_read[0] = &dis.WRAM[0x6000];
+                mb.micache.mc_execute[0] = &dis.WRAM[0x6000];
                 
                 mb.PC = 0;
                 mb.DIV = 0;
@@ -1119,7 +1113,11 @@ int main(int argc, char** argv)
             regdump(&mb);
         
 #ifdef DOUBLESPEED
+    #if CONFIG_IS_CGB
+        word repeat = (userdata.CGB_SPEED & 0x80) ? 1 : 0;
+    #else
         word repeat = 1;
+    #endif
         word totalcycles = 0;
 #endif
         word cycles;
@@ -1168,6 +1166,20 @@ int main(int argc, char** argv)
         {
             //printf("! HALT @ %02X:%04X | IE=%02X (IF=%02X) | LCDC=%02X STAT=%02X LYC=%02X LY=%02X\n", mb.mi->BANK_ROM, mb.PC, mb.IE, mb.IF & 0x1F, pp.rLCDC, pp.rSTAT, pp.rLYC, pp.state.scanY);
             //Sleep(1000);
+            
+#if CONFIG_IS_CGB
+            if(mb.IMM.high == 0x10)
+            {
+                mb.DIV = 0;
+                if(userdata.CGB_SPEED & 1)
+                {
+                    mb.HALTING = 0;
+                    userdata.CGB_SPEED ^= 0x80;
+                    userdata.CGB_SPEED &= 0xFE;
+                }
+            }
+#endif
+            
             mb.IR.high = 1;
         }
         
@@ -1204,6 +1216,9 @@ int main(int argc, char** argv)
             goto tryagain;
         }
         else
+#if CONFIG_IS_CGB
+        if(userdata.CGB_SPEED & 0x80)
+#endif
         {
             cycle_error += totalcycles;
             cycles = cycle_error >> 1;
