@@ -105,9 +105,16 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
     }
     else // WRAM only [$C000; $FFFF] for OAMDMA
     {
-        if(!(r_addr & MICACHE_R_VALUE(0x1000)))
+        if(COMPILER_UNLIKELY(r_addr >= MICACHE_R_VALUE(0x10000)))
+            __builtin_unreachable();
+        
+        if(r_addr < MICACHE_R_VALUE(0xE000))
+            r_addr -= MICACHE_R_VALUE(0xC000);
+        else
+            r_addr -= MICACHE_R_VALUE(0xE000);
+        
+        if(r_addr < MICACHE_R_VALUE(0x1000))
         {
-            r_addr &= MICACHE_R_VALUE(0x0FFF);
             return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
         }
         else
@@ -116,7 +123,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
             if(!bank)
                 bank = 1;
             
-            r_addr &= MICACHE_R_VALUE(0x0FFF);
+            r_addr -= MICACHE_R_VALUE(0x1000);
             return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
         }
     }
@@ -147,9 +154,16 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static r8* __restri
     }
     else // WRAM only [$C000; $FFFF] for OAMDMA
     {
-        if(!(r_addr & MICACHE_R_VALUE(0x1000)))
+        if(COMPILER_UNLIKELY(r_addr >= MICACHE_R_VALUE(0x10000)))
+            __builtin_unreachable();
+        
+        if(r_addr < MICACHE_R_VALUE(0xE000))
+            r_addr -= MICACHE_R_VALUE(0xC000);
+        else
+            r_addr -= MICACHE_R_VALUE(0xE000);
+        
+        if(r_addr < MICACHE_R_VALUE(0x1000))
         {
-            r_addr &= MICACHE_R_VALUE(0x0FFF);
             return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
         }
         else
@@ -158,7 +172,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static r8* __restri
             if(!bank)
                 bank = 1;
             
-            r_addr &= MICACHE_R_VALUE(0x0FFF);
+            r_addr -= MICACHE_R_VALUE(0x1000);
             return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
         }
     }
