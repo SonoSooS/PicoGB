@@ -984,7 +984,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         data_result = mb->reg.HL;
                         word mres = data_result + data_reg;
                         if(mres >> 16)
-                            data_flags |= MB_FLAG_C;
+                            data_flags += MB_FLAG_C;
                         
                         mb->reg.HL = mres;
                         mb->reg.F = data_flags;
@@ -1072,10 +1072,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     if(IR & 1) // DEC
                     {
-                        data_flags |= MB_FLAG_N;
+                        data_flags += MB_FLAG_N;
                         
                         if((data_reg & 0xF) == 0)
-                            data_flags |= MB_FLAG_H;
+                            data_flags += MB_FLAG_H;
                         
                         data_reg = (data_reg - 1) & 0xFF;
                     }
@@ -1084,11 +1084,11 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         data_reg = (data_reg + 1) & 0xFF;
                         
                         if((data_reg & 0xF) == 0)
-                            data_flags |= MB_FLAG_H;
+                            data_flags += MB_FLAG_H;
                     }
                     
                     if(!data_reg)
-                        data_flags |= MB_FLAG_Z;
+                        data_flags += MB_FLAG_Z;
                     
                     mb->reg.F = data_flags;
                     mb->FMC_MODE = MB_FMC_MODE_NONE; // we calculate flags in-place
@@ -1229,7 +1229,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         
                         instr_067:
                         case 6: // SET Cy
-                            mb->reg.F = (mb->reg.F & MB_FLAG_Z) | MB_FLAG_C;
+                            mb->reg.F = (mb->reg.F & MB_FLAG_Z) + MB_FLAG_C;
                             
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
@@ -1380,7 +1380,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         data_flags = MB_FLAG_N;
                     
                     if(!(data_result & 0xFF))
-                        data_flags |= MB_FLAG_Z;
+                        data_flags += MB_FLAG_Z;
                     
                     mb->reg.F = data_flags;
                     
@@ -1415,7 +1415,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
             }
             
             if(!(data_result & 0xFF))
-                data_flags |= MB_FLAG_Z;
+                data_flags += MB_FLAG_Z;
             
             {
                 hilow16_t sta;
@@ -1470,10 +1470,10 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             data_flags = 0;
                             
                             if(((data_wide & 0xFF) + (data_reg & 0xFF)) >> 8)
-                                data_flags |= MB_FLAG_C;
+                                data_flags += MB_FLAG_C;
                             
                             if(((data_wide & 0xF) + (data_reg & 0xF)) >> 4)
-                                data_flags |= MB_FLAG_H;
+                                data_flags += MB_FLAG_H;
                             
                             data_wide = (data_wide + data_reg) & 0xFFFF;
                             
@@ -1522,7 +1522,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             {
                                 var SP = mb->SP;
                                 data_wide = mch_memory_dispatch_read(mb, SP++);
-                                data_wide |= mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
+                                data_wide += mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
                                 mb->SP = SP;
                                 
                                 mb->PC = data_wide;
@@ -1559,7 +1559,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         
                         SP = mb->SP;
                         data_wide = mch_memory_dispatch_read(mb, SP++);
-                        data_wide |= mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
+                        data_wide += mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
                         mb->SP = SP;
                         
                         i_src = (IR >> 4) & 3;
@@ -1879,7 +1879,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 
                 data_reg &= 0xFF;
                 if(!data_reg)
-                    data_flags |= MB_FLAG_Z;
+                    data_flags += MB_FLAG_Z;
                 
                 mb->reg.F = data_flags;
                 goto cb_writeback;
@@ -1888,9 +1888,9 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 data_flags = mb->reg.F;
                 
                 if(data_reg & (1 << i_src))
-                    data_flags = (data_flags & MB_FLAG_C) | (MB_FLAG_H);
+                    data_flags = (data_flags & MB_FLAG_C) + (MB_FLAG_H);
                 else
-                    data_flags = (data_flags & MB_FLAG_C) | (MB_FLAG_H | MB_FLAG_Z);
+                    data_flags = (data_flags & MB_FLAG_C) + (MB_FLAG_H | MB_FLAG_Z);
                 
                 mb->reg.F = data_flags;
                 
