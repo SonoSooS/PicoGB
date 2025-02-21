@@ -920,13 +920,20 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             
                             // Wedge if unbreakable spinloop is detected
                             // TODO: unfuck this statement
-                            if(data_wide == 0xFE && ((!mb->IME && !mb->IME_ASK) || (!mb->IE && !(mb->IF & 0x1F))))
-                                return 0; // wedge until NMI
-                            
-                            if(data_wide >= 0x80)
-                                data_wide += 0xFF00;
-                            
-                            mb->PC = (data_wide + PC + 1) & 0xFFFF;
+                            if(data_wide != 0xFE)
+                            {
+                                if(data_wide >= 0x80)
+                                    data_wide += 0xFF00;
+                                
+                                mb->PC = (data_wide + PC + 1) & 0xFFFF;
+                            }
+                            else
+                            {
+                                if((!mb->IME && !mb->IME_ASK) || (!mb->IE && !mb->IF))
+                                    return 0; // wedge until NMI
+                                
+                                mb->PC = PC - 1;
+                            }
                             
                             ncycles += 2; // op fetch + ALU IDU Cy magic
                             goto generic_fetch;
