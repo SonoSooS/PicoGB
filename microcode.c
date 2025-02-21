@@ -70,14 +70,14 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
             else
             {
             #if CONFIG_USE_FLAT_ROM
-                r_addr &= MICACHE_R_VALUE(0x3FFF);
+                r_addr -= MICACHE_R_VALUE(0x4000);
                 ret = &mi->ROM[mi->BANK_ROM << 14];
                 return &ret[r_addr << MICACHE_R_BITS];
             #else
                 ret = mi->ROM[mi->BANK_ROM];
                 if(ret != NULL)
                 {
-                    r_addr &= MICACHE_R_VALUE(0x3FFF);
+                    r_addr -= MICACHE_R_VALUE(0x4000);
                     return &ret[r_addr << MICACHE_R_BITS];
                 }
             #endif
@@ -93,14 +93,14 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
     {
         const r8* __restrict ptr = &mi->VRAM[mi->BANK_VRAM << 13];
         
-        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        r_addr -= MICACHE_R_VALUE(0x8000);
         return &(ptr[r_addr << MICACHE_R_BITS]);
     }
     else if(r_addr < MICACHE_R_VALUE(0xC000))
     {
         const r8* __restrict ptr = &mi->SRAM[mi->BANK_SRAM << 13];
         
-        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        r_addr -= MICACHE_R_VALUE(0xA000);
         return &(ptr[r_addr << MICACHE_R_BITS]);
     }
     else // WRAM only [$C000; $FFFF] for OAMDMA
@@ -135,14 +135,14 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static r8* __restri
     {
         r8* __restrict ptr = &mi->VRAM[mi->BANK_VRAM << 13];
         
-        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        r_addr -= MICACHE_R_VALUE(0x8000);
         return &(ptr[r_addr << MICACHE_R_BITS]);
     }
     else if(r_addr < MICACHE_R_VALUE(0xC000))
     {
         r8* __restrict ptr = &mi->SRAM[mi->BANK_SRAM << 13];
         
-        r_addr &= MICACHE_R_VALUE(0x1FFF);
+        r_addr -= MICACHE_R_VALUE(0xA000);
         return &(ptr[r_addr << MICACHE_R_BITS]);
     }
     else // WRAM only [$C000; $FFFF] for OAMDMA
@@ -463,7 +463,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_mem
     word res2 = mch_memory_fetch_decode_1_noinline(mb, addr2);
     
     var res = res1;
-    res |= (res2) << 8;
+    res += (res2) << 8;
     
     return res;
 }
@@ -475,7 +475,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static wor
     const volatile r8* __restrict ptr = &mb->mi->HRAM[addr];
     
     var nres = ptr[0];
-    nres |= ptr[1] << 8;
+    nres += ptr[1] << 8;
     
     return nres;
 }
@@ -490,7 +490,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static wor
     const volatile r8* __restrict ptr = mch_resolve_mic_execute(mb, addr);
     
     word nres = ptr[0];
-    nres |= ptr[1] << 8;
+    nres += ptr[1] << 8;
     
     return nres;
 }
@@ -800,7 +800,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
             {
                 if(F & (1 << i))
                 {
-                    mb->PC = 0x40 | (i << 3);
+                    mb->PC = 0x40 + (i << 3);
                     break;
                 }
                 
@@ -838,7 +838,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
     {
         if(IR == 0xF0)
         {
-            data_wide = 0xFF00 | mch_memory_fetch_PC_op_1(mb);
+            data_wide = 0xFF00 + mch_memory_fetch_PC_op_1(mb);
             goto instr_360;
         }
         else if(IR == 0xFA)
@@ -906,7 +906,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                                 return 0; // wedge until NMI
                             
                             if(data_wide >= 0x80)
-                                data_wide |= 0xFF00;
+                                data_wide += 0xFF00;
                             
                             mb->PC = (data_wide + PC + 1) & 0xFFFF;
                             
@@ -1412,7 +1412,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     {
                         if(!(IR & 8)) // LDH a8
                         {
-                            data_wide = 0xFF00 | mch_memory_fetch_PC_op_1(mb);
+                            data_wide = 0xFF00 + mch_memory_fetch_PC_op_1(mb);
                             
                             if(IR & 0x10)
                             {
@@ -1436,7 +1436,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         instr_weird_r16_r8:
                             data_wide = mch_memory_fetch_PC_op_1(mb);
                             if(data_wide >= 0x80)
-                                data_wide |= 0xFF00;
+                                data_wide += 0xFF00;
                             
                             data_reg = mb->SP;
                             //mbh_fr_set_r16_add_r8(mb, data_reg, data_wide);
@@ -1576,7 +1576,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         }
                         else // LDH C
                         {
-                            data_wide = 0xFF00 | mb->reg.C;
+                            data_wide = 0xFF00 + mb->reg.C;
                             
                             if(!(IR & 0x10))
                             {
