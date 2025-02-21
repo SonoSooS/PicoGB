@@ -22,6 +22,9 @@
 #define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
 #define USE_MI struct mi_dispatch* __restrict mi = mb->mi;
 
+//#define R_RELATIVE_ADDR (addr & MICACHE_R_SEL)
+#define R_RELATIVE_ADDR (addr - (r_addr << MICACHE_R_BITS))
+
 
 #pragma region Microcode I/O
 
@@ -202,7 +205,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
         mic->mc_read[r_addr] = ptr;
 #endif
         
-        return &ptr[addr & MICACHE_R_SEL];
+        return &ptr[R_RELATIVE_ADDR];
     }
     
     return NULL;
@@ -218,7 +221,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
     
     ptr = mb->micache.mc_read[r_addr];
     if(COMPILER_LIKELY(ptr != NULL))
-        return &ptr[addr & MICACHE_R_SEL];
+        return &ptr[R_RELATIVE_ADDR];
 #endif
     
     return mch_resolve_mic_read_slow(mb, addr);
@@ -238,7 +241,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
     
     ptr = mb->micache.mc_read[r_addr];
     if(COMPILER_LIKELY(ptr != NULL))
-        return ptr[addr & MICACHE_R_SEL];
+        return ptr[R_RELATIVE_ADDR];
     else
 #endif
     
@@ -260,7 +263,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static void mch_res
     if(COMPILER_LIKELY(ptr != NULL))
     {
         mic->mc_write[r_addr] = ptr;
-        ptr[addr & MICACHE_R_SEL] = data;
+        ptr[R_RELATIVE_ADDR] = data;
         return;
     }
     
@@ -285,7 +288,8 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static voi
     COMPILER_VARIABLE_BARRIER(ptr);
     if(ptr != NULL)
     {
-        mch_resolve_write_deref(ptr, addr, data); // prevent register allocator spill, as it's slower than a tail call
+        //mch_resolve_write_deref(ptr, addr, data); // prevent register allocator spill, as it's slower than a tail call
+        ptr[R_RELATIVE_ADDR] = data;
         return;
     }
     else
@@ -312,7 +316,7 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
         mic->mc_execute[r_addr] = ptr;
 #endif
         
-        return &ptr[addr & MICACHE_R_SEL];
+        return &ptr[R_RELATIVE_ADDR];
     }
     
     return NULL;
@@ -328,7 +332,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
     
     ptr = mb->micache.mc_execute[r_addr];
     if(COMPILER_LIKELY(ptr != NULL))
-        return &ptr[addr & MICACHE_R_SEL];
+        return &ptr[R_RELATIVE_ADDR];
 #endif
     
     return mch_resolve_mic_execute_slow(mb, addr);
@@ -353,7 +357,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
     
     ptr = mb->micache.mc_execute[r_addr];
     if(COMPILER_LIKELY(ptr != NULL))
-        return ptr[addr & MICACHE_R_SEL];
+        return ptr[R_RELATIVE_ADDR];
     else
 #endif
     
