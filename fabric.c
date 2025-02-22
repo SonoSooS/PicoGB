@@ -204,7 +204,8 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
                 if(MB_TYPE_IS_WRITE(type))
                 {
                     if(!(ud->TIMER_CNT & 4))
-                        ud->TIMER_SUB = -2;
+                        //ud->TIMER_SUB = -2;
+                        ud->TIMER_SUB = 0;
                     //ud->TIMER_ACCUM = ud->TIMER_LOAD;
                     ud->TIMER_CNT = data & 7;
                     return data;
