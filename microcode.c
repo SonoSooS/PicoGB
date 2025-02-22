@@ -15,7 +15,7 @@
 #define IR_F_ROW IR_row
 #endif
 
-#define MB_AF_R ((mb->reg.A << 8) | mb->reg.F)
+#define MB_AF_R ((mb->reg.A << 8) + mb->reg.F)
 #define MB_AF_W(v) {mb->reg.A = ((v) >> 8) & 0xFF; mb->reg.F = (v) & MB_FLAG_BITS;}
 #define MB_CC_CHECK (mbh_cc_check(IR, mb->reg.F))
 
@@ -45,101 +45,14 @@ PGB_FUNC static inline const r8* __restrict mch_resolve_mic_bank_internal(const 
 }
 #endif
 
-// Uncached resolve aligned readable const memory area, based on address
-PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __restrict mch_resolve_mic_r_direct_read(const self mb, word r_addr)
-{
-    USE_MI;
-    
-    const r8* __restrict ret = NULL;
-    
-    if(r_addr < MICACHE_R_VALUE(0x8000))
-    {
-        //TODO: optimize this for LRU
-    #if CONFIG_ENABLE_LRU
-        if(mi->ROM != NULL)
-    #endif
-        {
-            if(r_addr < MICACHE_R_VALUE(0x4000))
-            {
-            #if CONFIG_USE_FLAT_ROM
-                ret = &mi->ROM[0];
-                return &ret[r_addr << MICACHE_R_BITS];
-            #else
-                ret = mi->ROM[0];
-                if(ret != NULL)
-                    return &ret[r_addr << MICACHE_R_BITS];
-            #endif
-            }
-            else
-            {
-            #if CONFIG_USE_FLAT_ROM
-                r_addr -= MICACHE_R_VALUE(0x4000);
-                ret = &mi->ROM[mi->BANK_ROM << 14];
-                return &ret[r_addr << MICACHE_R_BITS];
-            #else
-                ret = mi->ROM[mi->BANK_ROM];
-                if(ret != NULL)
-                {
-                    r_addr -= MICACHE_R_VALUE(0x4000);
-                    return &ret[r_addr << MICACHE_R_BITS];
-                }
-            #endif
-            }
-        }
-        
-    #if CONFIG_ENABLE_LRU
-        ret = mch_resolve_mic_bank_internal(mb, r_addr);
-    #endif
-        return ret;
-    }
-    else if(r_addr < MICACHE_R_VALUE(0xA000))
-    {
-        const r8* __restrict ptr = &mi->VRAM[mi->BANK_VRAM << 13];
-        
-        r_addr -= MICACHE_R_VALUE(0x8000);
-        return &(ptr[r_addr << MICACHE_R_BITS]);
-    }
-    else if(r_addr < MICACHE_R_VALUE(0xC000))
-    {
-        const r8* __restrict ptr = &mi->SRAM[mi->BANK_SRAM << 13];
-        
-        r_addr -= MICACHE_R_VALUE(0xA000);
-        return &(ptr[r_addr << MICACHE_R_BITS]);
-    }
-    else // WRAM only [$C000; $FFFF] for OAMDMA
-    {
-        if(COMPILER_UNLIKELY(r_addr >= MICACHE_R_VALUE(0x10000)))
-            __builtin_unreachable();
-        
-        if(r_addr < MICACHE_R_VALUE(0xE000))
-            r_addr -= MICACHE_R_VALUE(0xC000);
-        else
-            r_addr -= MICACHE_R_VALUE(0xE000);
-        
-        if(r_addr < MICACHE_R_VALUE(0x1000))
-        {
-            return &(mi->WRAM[r_addr << MICACHE_R_BITS]);
-        }
-        else
-        {
-            var bank = mi->BANK_WRAM;
-            if(!bank)
-                bank = 1;
-            
-            r_addr -= MICACHE_R_VALUE(0x1000);
-            return &(mi->WRAM[(bank << 12) + (r_addr << MICACHE_R_BITS)]);
-        }
-    }
-}
-
-PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static r8* __restrict mch_resolve_mic_r_direct_write(const self mb, word r_addr)
+PGB_FUNC static r8* __restrict mch_resolve_mic_r_direct(const self mb, word r_addr)
 {
     USE_MI;
     
     if(r_addr < MICACHE_R_VALUE(0x8000))
     {
-        // ROM is *Read-Only* Memory, can't write to it normally
-        return NULL;
+        // ROM area is unpredictable, can't calculate it here
+        __builtin_unreachable();
     }
     else if(r_addr < MICACHE_R_VALUE(0xA000))
     {
@@ -181,6 +94,75 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static r8* __restri
     }
 }
 
+PGB_FUNC static const r8* __restrict mch_resolve_mic_r_direct_ROM(const self mb, word r_addr)
+{
+    USE_MI;
+    
+    const r8* __restrict ret = NULL;
+    
+    //TODO: optimize this for LRU
+#if CONFIG_ENABLE_LRU
+    if(mi->ROM != NULL)
+#endif
+    {
+        if(r_addr < MICACHE_R_VALUE(0x4000))
+        {
+        #if CONFIG_USE_FLAT_ROM
+            ret = &mi->ROM[0];
+            return &ret[r_addr << MICACHE_R_BITS];
+        #else
+            ret = mi->ROM[0];
+            if(ret != NULL)
+                return &ret[r_addr << MICACHE_R_BITS];
+        #endif
+        }
+        else
+        {
+        #if CONFIG_USE_FLAT_ROM
+            r_addr -= MICACHE_R_VALUE(0x4000);
+            ret = &mi->ROM[mi->BANK_ROM << 14];
+            return &ret[r_addr << MICACHE_R_BITS];
+        #else
+            ret = mi->ROM[mi->BANK_ROM];
+            if(ret != NULL)
+            {
+                r_addr -= MICACHE_R_VALUE(0x4000);
+                return &ret[r_addr << MICACHE_R_BITS];
+            }
+        #endif
+        }
+    }
+    
+#if CONFIG_ENABLE_LRU
+    ret = mch_resolve_mic_bank_internal(mb, r_addr);
+#endif
+    return ret;
+}
+
+// Uncached resolve aligned readable const memory area, based on address
+PGB_FUNC ATTR_FORCE_NOINLINE static const r8* __restrict mch_resolve_mic_r_direct_read(const self mb, word r_addr)
+{
+    if(r_addr < MICACHE_R_VALUE(0x8000))
+    {
+        return mch_resolve_mic_r_direct_ROM(mb, r_addr);
+    }
+    
+    return mch_resolve_mic_r_direct(mb, r_addr);
+}
+
+PGB_FUNC ATTR_FORCE_NOINLINE static r8* __restrict mch_resolve_mic_r_direct_write(const self mb, word r_addr)
+{
+    if(r_addr < MICACHE_R_VALUE(0x8000))
+    {
+        __builtin_unreachable();
+        
+        // ROM is *Read-Only* Memory, can't write to it normally
+        return NULL;
+    }
+    
+    return mch_resolve_mic_r_direct(mb, r_addr);
+}
+
 #pragma endregion
 
 #pragma region Resolve cached memory region (by address)
@@ -211,28 +193,12 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __
     return NULL;
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inline const r8* __restrict mch_resolve_mic_read(self mb, word addr)
-{
-    
-#if !CONFIG_MIC_CACHE_BYPASS
-    var r_addr = MICACHE_R_VALUE(addr);
-    
-    const r8* __restrict ptr;
-    
-    ptr = mb->micache.mc_read[r_addr];
-    if(COMPILER_LIKELY(ptr != NULL))
-        return &ptr[R_RELATIVE_ADDR];
-#endif
-    
-    return mch_resolve_mic_read_slow(mb, addr);
-}
-
 PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_resolve_mic_read_slow_deref(self mb, word addr)
 {
     return *mch_resolve_mic_read_slow(mb, addr);
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inline word mch_resolve_mic_read_deref(self mb, word addr)
+PGB_FUNC ATTR_HOT __attribute__((optimize("O2"))) static word mch_resolve_mic_read_deref(self mb, word addr)
 {
 #if !CONFIG_MIC_CACHE_BYPASS
     var r_addr = MICACHE_R_VALUE(addr);
@@ -267,13 +233,14 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static void mch_res
         return;
     }
     
+    __builtin_unreachable();
     *ptr = data;
 }
 
-PGB_FUNC ATTR_HOT __attribute__((optimize("Os"))) static void mch_resolve_write_deref(r8* __restrict ptr, word addr, word data)
+PGB_FUNC ATTR_HOT __attribute__((optimize("Os"))) static void mch_resolve_mic_write_deref_helper(r8* __restrict ptr, word addr, word data)
 {
-    addr &= MICACHE_R_SEL;
-    COMPILER_VARIABLE_BARRIER(addr);
+    var r_addr = MICACHE_R_VALUE(addr);
+    addr = R_RELATIVE_ADDR;
     ptr[addr] = data;
 }
 
@@ -285,11 +252,9 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static voi
     r8* __restrict ptr;
     
     ptr = mb->micache.mc_write[r_addr];
-    COMPILER_VARIABLE_BARRIER(ptr);
     if(ptr != NULL)
     {
-        //mch_resolve_write_deref(ptr, addr, data); // prevent register allocator spill, as it's slower than a tail call
-        ptr[R_RELATIVE_ADDR] = data;
+        mch_resolve_mic_write_deref_helper(ptr, addr, data); //HACK: prevent register allocator spill, as it's slower than a tail call
         return;
     }
     else
@@ -338,11 +303,6 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
     return mch_resolve_mic_execute_slow(mb, addr);
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static const r8* __restrict mch_resolve_mic_execute_noinline(self mb, word addr)
-{
-    return mch_resolve_mic_execute(mb, addr);
-}
-
 PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_resolve_mic_execute_slow_deref(self mb, word addr)
 {
     return *mch_resolve_mic_execute_slow(mb, addr);
@@ -368,82 +328,166 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
 
 #pragma endregion
 
+#pragma region Dispatch
+
 #pragma region Dispatch special (IO + ROM)
 
-PGB_FUNC static word mch_memory_dispatch_read_fexx_ffxx(const self mb, word addr)
+PGB_FUNC ATTR_FORCE_NOINLINE  __attribute__((optimize("O2"))) static void mch_memory_dispatch_write_ROM(const self mb, word addr, word data)
 {
-    if(addr >= 0xFF80) // HRAM + IE
-    {
-        var hm = addr & 0xFF;
-        
-        if(hm != 0xFF)
-        {
-            return mb->mi->HRAM[hm - 0x80];
-        }
-        else
-        {
-            return mb->IE;
-        }
-    }
-    
-    // Handle IO by fabric
-    return mb->mi->dispatch_IO(mb->mi->userdata, addr, MB_DATA_DONTCARE, MB_TYPE_READ);
-}
-
-PGB_FUNC static void mch_memory_dispatch_write_fexx_ffxx(self mb, word addr, word data)
-{
-    if(addr >= 0xFF80) // HRAM + IE
-    {
-        var hm = addr & 0xFF;
-        
-        if(hm != 0xFF)
-        {
-            mb->mi->HRAM[hm - 0x80] = data;
-        }
-        else
-        {
-            mb->IE = data & 0xFF;
-        }
-        
-        return;
-    }
-    
-    // Handle IO by fabric
-    mb->mi->dispatch_IO(mb->mi->userdata, addr, data, MB_TYPE_WRITE);
-}
-
-PGB_FUNC ATTR_FORCE_NOINLINE static void mch_memory_dispatch_write_ROM(const self mb, word addr, word data)
-{
-    // Write to ROM has special meaning, handle by fabric
     mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, MB_TYPE_WRITE);
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_IO(const self mb, word haddr)
+{
+    return mb->mi->dispatch_IO(mb->mi->userdata, haddr, MB_DATA_DONTCARE, MB_TYPE_READ);
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE  __attribute__((optimize("O2"))) static void mch_memory_dispatch_write_IO(const self mb, word haddr, word data)
+{
+    mb->mi->dispatch_IO(mb->mi->userdata, haddr, data, MB_TYPE_WRITE);
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_HRAM(const self mb, word haddr)
+{
+    if(haddr < 0xFF)
+        return mb->mi->HRAM[haddr - 0x80];
+    else
+        return mb->IE;
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_dispatch_read_Haddr(const self mb, word haddr)
+{
+    if(haddr < 0x80)
+        return mch_memory_dispatch_read_IO(mb, haddr);
+    else
+        return mch_memory_dispatch_read_HRAM(mb, haddr);
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static void mch_memory_dispatch_write_Haddr(self mb, word haddr, word data)
+{
+    if(haddr < 0x80)
+        return mch_memory_dispatch_write_IO(mb, haddr, data);
+    else if(haddr < 0xFF)
+        mb->mi->HRAM[haddr - 0x80] = data;
+    else
+        mb->IE = data;
+}
+
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_fexx_ffxx(const self mb, word addr)
+{
+    if(addr & 0x100)
+        return mch_memory_dispatch_read_Haddr(mb, addr & 0xFF);
+    
+    return mb->mi->OAM[addr & 0xFF];
+}
+
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static void mch_memory_dispatch_write_fexx_ffxx(self mb, word addr, word data)
+{
+    if(addr & 0x100)
+        return mch_memory_dispatch_write_Haddr(mb, addr & 0xFF, data);
+    
+    mb->mi->OAM[addr & 0xFF] = addr;
 }
 
 #pragma endregion
 
-#pragma region Dispatch
+#pragma region Dispatch fetch (1)
 
-// Handle read from memory by microcode, including ECHO RAM
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_dispatch_read_(self mb, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_1(self mb, word addr)
 {
     if(COMPILER_LIKELY(addr < 0xFE00))
-        return mch_resolve_mic_read_deref(mb, addr);
+        return mch_resolve_mic_execute_deref(mb, addr);
     else
         return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
-#if CONFIG_DBG
-PGB_FUNC static word mch_memory_dispatch_read(self mb, word addr)
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_1(self mb)
 {
-    DBGF("- /RD %04X -> ", addr);
-    word res = mch_memory_dispatch_read_(mb, addr);
-    DBGF("%02X\n", res);
+    word addr = mb->PC;
+    mb->PC = (addr + 1) & 0xFFFF;
+    
+    var res = mch_memory_fetch_decode_1(mb, addr);
+    DBGF("- /O1 %04X <> %02X\n", addr, res);
     return res;
 }
-#else
-#define mch_memory_dispatch_read mch_memory_dispatch_read_
-#endif
 
-// Handle write to address from microcode, including ECHO RAM support
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self mb)
+{
+    word addr = mb->PC;
+    mb->PC = (addr + 1) & 0xFFFF;
+    
+    var res = mch_memory_fetch_decode_1(mb, addr);
+    DBGF("- /M1 %04X <> %02X\n", addr, res);
+    return res;
+}
+
+#pragma endregion
+
+#pragma region Dispatch fetch (2)
+
+PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O1"))) static word mch_memory_fetch_decode_2_slow(self mb, word addr)
+{
+    word addr2 = (addr + 1) & 0xFFFF;
+    
+    word res1 = mch_memory_fetch_decode_1(mb, addr);
+    word res2 = mch_memory_fetch_decode_1(mb, addr2);
+    
+    var res = res1;
+    res += (res2) << 8;
+    
+    return res;
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O1"))) static word mch_resolve_mic_execute_deref_2_aligned(self mb, word addr)
+{
+    // This may have to be volatile, otherwise
+    //  an LDRH is emitted, which is no cool, as
+    //  the pointer will very likely be not aligned.
+    // This sadly wastes precious CPU cycles,
+    //  but it's necessary to avoid unaligned data abort.
+    const r8* __restrict ptr = mch_resolve_mic_execute(mb, addr);
+    
+    word nres = ptr[0];
+    nres += ptr[1] << 8;
+    
+    return nres;
+}
+
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_2(self mb, word addr)
+{
+#if !CONFIG_MIC_CACHE_BYPASS
+    
+    if(COMPILER_LIKELY(addr < 0xFE00)) // yeah, this is an off-by-one error, and I don't care
+    {
+        //word r1 = MICACHE_R_VALUE(addr);
+        //word r2 = MICACHE_R_VALUE(addr + 1);
+        //if(r1 == r2)
+        
+        if(COMPILER_LIKELY((addr + 1) & MICACHE_R_SEL)) // same as above commented code
+        {
+            return mch_resolve_mic_execute_deref_2_aligned(mb, addr);
+        }
+    }
+#endif
+    
+    return mch_memory_fetch_decode_2_slow(mb, addr);
+}
+
+PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_2(self mb)
+{
+    word addr = mb->PC;
+    mb->PC = (addr + 2) & 0xFFFF;
+    
+    word resp = mch_memory_fetch_decode_2(mb, addr);
+    DBGF("- /O2 %04X <> %04X\n", addr, resp);
+    return resp;
+}
+
+
+#pragma endregion
+
+#pragma region Dispatch read and write
+
 PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static void mch_memory_dispatch_write(self mb, word addr, word data)
 {
     DBGF("- /WR %04X <- %02X\n", addr, data);
@@ -459,121 +503,25 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static voi
         mch_memory_dispatch_write_ROM(mb, addr, data);
 }
 
-// Fetch one byte as part of an instruction
-PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_1(self mb, word addr)
+PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_dispatch_read_(self mb, word addr)
 {
     if(COMPILER_LIKELY(addr < 0xFE00))
-        return mch_resolve_mic_execute_deref(mb, addr);
+        return mch_resolve_mic_read_deref(mb, addr);
     else
         return mch_memory_dispatch_read_fexx_ffxx(mb, addr);
 }
 
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE static word mch_memory_fetch_decode_1_noinline(self mb, word addr)
+#if CONFIG_DBG
+PGB_FUNC ATTR_HOT static word mch_memory_dispatch_read(self mb, word addr)
 {
-    return mch_memory_fetch_decode_1(mb, addr);
-}
-
-PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_fetch_decode_2_slow(self mb, word addr)
-{
-    word addr2 = (addr + 1) & 0xFFFF;
-    
-    word res1 = mch_memory_fetch_decode_1_noinline(mb, addr);
-    word res2 = mch_memory_fetch_decode_1_noinline(mb, addr2);
-    
-    var res = res1;
-    res += (res2) << 8;
-    
+    DBGF("- /RD %04X -> ", addr);
+    word res = mch_memory_dispatch_read_(mb, addr);
+    DBGF("%02X\n", res);
     return res;
 }
-
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_resolve_mic_execute_deref_2_HRAM(self mb, word addr)
-{
-    addr = (addr - 0x80) & 0xFF;
-    
-    const volatile r8* __restrict ptr = &mb->mi->HRAM[addr];
-    
-    var nres = ptr[0];
-    nres += ptr[1] << 8;
-    
-    return nres;
-}
-
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_resolve_mic_execute_deref_2(self mb, word addr)
-{
-    // This has to be volatile, otherwise
-    //  an LDRH is emitted, which is no cool, as
-    //  the pointer will very likely be not aligned.
-    // This sadly wastes precious CPU cycles,
-    //  but it's necessary to avoid unaligned data abort.
-    const volatile r8* __restrict ptr = mch_resolve_mic_execute(mb, addr);
-    
-    word nres = ptr[0];
-    nres += ptr[1] << 8;
-    
-    return nres;
-}
-
-// Fetch two bytes as part of an instruction
-PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static word mch_memory_fetch_decode_2(self mb, word addr)
-{
-#if !CONFIG_MIC_CACHE_BYPASS
-    
-    if(COMPILER_LIKELY(addr < 0xFE00)) // yeah, this is an off-by-one error, and I don't care
-    {
-        //word r1 = MICACHE_R_VALUE(addr);
-        //word r2 = MICACHE_R_VALUE(addr + 1);
-        //if(COMPILER_LIKELY(r1 == r2))
-        
-        word tmp = ~addr;
-        COMPILER_VARIABLE_BARRIER(tmp);
-        tmp &= MICACHE_R_SEL;
-        COMPILER_VARIABLE_BARRIER(tmp);
-        
-        if(COMPILER_LIKELY(tmp)) // same as above commented code
-        {
-            return mch_resolve_mic_execute_deref_2(mb, addr);
-        }
-    }
-    else if(addr >= 0xFF80) // This is off by 2, but let's be honest, if this triggers, we're already lost
-    {
-        return mch_resolve_mic_execute_deref_2_HRAM(mb, addr);
-    }
+#else
+#define mch_memory_dispatch_read mch_memory_dispatch_read_
 #endif
-    
-    return mch_memory_fetch_decode_2_slow(mb, addr);
-}
-
-// Fetch one byte from PC, incrementing it as well
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC(self mb)
-{
-    word addr = mb->PC;
-    mb->PC = (addr + 1) & 0xFFFF;
-    
-    var res = mch_memory_fetch_decode_1(mb, addr);
-    DBGF("- /M1 %04X <> %02X\n", addr, res);
-    return res;
-}
-
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_1(self mb)
-{
-    word addr = mb->PC;
-    mb->PC = (addr + 1) & 0xFFFF;
-    
-    var res = mch_memory_fetch_decode_1(mb, addr);
-    DBGF("- /O1 %04X <> %02X\n", addr, res);
-    return res;
-}
-
-// Fetch two bytes from PC, incrementing it both times as well
-PGB_FUNC ATTR_HOT static word mch_memory_fetch_PC_op_2(self mb)
-{
-    word addr = mb->PC;
-    mb->PC = (addr + 2) & 0xFFFF;
-    
-    word resp = mch_memory_fetch_decode_2(mb, addr);
-    DBGF("- /O2 %04X <> %04X\n", addr, resp);
-    return resp;
-}
 
 #pragma endregion
 
@@ -856,7 +804,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
     {
         if(IR == 0xF0)
         {
-            data_wide = 0xFF00 + mch_memory_fetch_PC_op_1(mb);
+            data_wide = mch_memory_fetch_PC_op_1(mb);
             goto instr_360;
         }
         else if(IR == 0xFA)
@@ -1437,20 +1385,20 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     {
                         if(!(IR & 8)) // LDH a8
                         {
-                            data_wide = 0xFF00 + mch_memory_fetch_PC_op_1(mb);
+                            data_wide = mch_memory_fetch_PC_op_1(mb);
                             
                             if(IR & 0x10)
                             {
                                 instr_360:
-                                DBGF("- /HR %04X -> ", data_wide);
-                                mb->reg.A = mch_memory_dispatch_read_fexx_ffxx(mb, data_wide);
+                                DBGF("- /HR %04X -> ", data_wide + 0xFF00);
+                                mb->reg.A = mch_memory_dispatch_read_Haddr(mb, data_wide);
                                 DBGF("%02X\n", mb->reg.A);
                             }
                             else
                             {
                                 instr_340:
-                                DBGF("- /HW %04X <- %02X\n", data_wide, mb->reg.A);
-                                mch_memory_dispatch_write_fexx_ffxx(mb, data_wide, mb->reg.A);
+                                DBGF("- /HW %04X <- %02X\n", data_wide + 0xFF00, mb->reg.A);
+                                mch_memory_dispatch_write_Haddr(mb, data_wide, mb->reg.A);
                             }
                             
                             ncycles += 2; // a8 op + memory access
@@ -1601,19 +1549,19 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         }
                         else // LDH C
                         {
-                            data_wide = 0xFF00 + mb->reg.C;
+                            data_wide = mb->reg.C;
                             
                             if(!(IR & 0x10))
                             {
                                 instr_342:
-                                DBGF("- /HW %04X <- %02X\n", data_wide, mb->reg.A);
-                                mch_memory_dispatch_write_fexx_ffxx(mb, data_wide, mb->reg.A);
+                                DBGF("- /HW %04X <- %02X\n", data_wide + 0xFF00, mb->reg.A);
+                                mch_memory_dispatch_write_Haddr(mb, data_wide, mb->reg.A);
                             }
                             else
                             {
                                 instr_362:
-                                DBGF("- /HR %04X -> ", data_wide);
-                                mb->reg.A = mch_memory_dispatch_read_fexx_ffxx(mb, data_wide);
+                                DBGF("- /HR %04X -> ", data_wide + 0xFF00);
+                                mb->reg.A = mch_memory_dispatch_read_Haddr(mb, data_wide);
                                 DBGF("%02X\n", mb->reg.A);
                             }
                             

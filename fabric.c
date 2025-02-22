@@ -116,11 +116,11 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
 {
     USE_UD;
     
-    assert(addr >= 0xFE00 && addr < 0xFF80);
+    assert(addr <= 0x7F);
     
-    if((addr >> 8) == 0xFF)
+    if(1)
     {
-        var reg = addr & 0xFF;
+        var reg = addr;
         var* __restrict rv;
         
         if(reg < 0x10) // random garbage
@@ -679,19 +679,6 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
         }
         
         return 0xFF;
-    }
-    else if((addr >> 8) == 0xFE)
-    {
-        //TODO: wtf is this even
-        r8* __restrict rv = (r8* __restrict)(size_t)&ud->ppu->OAM[addr & 0xFF];
-        
-        if(MB_TYPE_IS_WRITE(type))
-        {
-            *rv = data;
-            return data;
-        }
-        
-        return *rv & 0xFF;
     }
     
     assert(!"bad reg");
