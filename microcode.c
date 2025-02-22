@@ -366,7 +366,7 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static wor
 PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) static void mch_memory_dispatch_write_Haddr(self mb, word haddr, word data)
 {
     if(haddr < 0x80)
-        return mch_memory_dispatch_write_IO(mb, haddr, data);
+        mch_memory_dispatch_write_IO(mb, haddr, data);
     else if(haddr < 0xFF)
         mb->mi->HRAM[haddr - 0x80] = data;
     else
@@ -384,7 +384,10 @@ PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_mem
 PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static void mch_memory_dispatch_write_fexx_ffxx(self mb, word addr, word data)
 {
     if(addr & 0x100)
-        return mch_memory_dispatch_write_Haddr(mb, addr & 0xFF, data);
+    {
+        mch_memory_dispatch_write_Haddr(mb, addr & 0xFF, data);
+        return;
+    }
     
     mb->mi->OAM[addr & 0xFF] = addr;
 }
@@ -838,14 +841,11 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 case 0: // whatever
                     switch(IR_row)
                     {
-                        instr_00:
                         case 0: // NOP
                             goto generic_fetch;
-                        instr_10:
                         case 2: // STOP
                             goto generic_fetch_stop; // STOP is just bugged NOP, lol
                         
-                        instr_08:
                         case 1: // LD a16, SP
                         {
                             data_wide = mch_memory_fetch_PC_op_2(mb);
@@ -859,7 +859,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             goto generic_fetch;
                         }
                         
-                        instr_18:
                         case 3: // JR e8
                         generic_jr:
                         {
@@ -914,7 +913,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     if(!(IR & 8)) // LD r16, n16
                     {
-                        instr_0x1_0:
                         data_wide = mch_memory_fetch_PC_op_2(mb);
                         
                         *p_reg16_ptr = data_wide;
@@ -924,8 +922,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     }
                     else // ADD HL, r16
                     {
-                        instr_0x1_1:
-                        
                         data_reg = *p_reg16_ptr;
                         data_flags = mb->reg.F & MB_FLAG_Z;
                         
@@ -946,7 +942,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 
                 case 2: // LD r16 ptr
                 {
-                    instr_0x2:
                     i_dst = (IR >> 4) & 3;
                     
                     if(i_dst < 2)
@@ -979,7 +974,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 
                 case 3: // INCDEC r16
                 {
-                    instr_0x3:
                     i_dst = (IR >> 4) & 3;
                     
                     if(i_dst != 3)
@@ -1003,7 +997,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 case 4: // INC r8
                 case 5: // DEC r8
                 {
-                    instr_0x45:
                     // Z1H-
                     
                     i_dst = IR_F_ROW ^ 1;
@@ -1054,7 +1047,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 
                 case 6: // LD r8, n8
                 {
-                    instr_0x6:
                     data_reg = mch_memory_fetch_PC_op_1(mb);
                     i_dst = IR_F_ROW ^ 1;
                     ncycles += 1; // n8 operand fetch
@@ -1066,7 +1058,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     switch(IR_row) 
                     {
-                        instr_007:
                         case 0: // RLCA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
@@ -1079,7 +1070,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
-                        instr_017:
                         case 1: // RRCA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
@@ -1092,7 +1082,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
-                        instr_027:
                         case 2: // RLA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
@@ -1105,7 +1094,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
-                        instr_037:
                         case 3: // RRA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
@@ -1118,7 +1106,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
-                        instr_047:
                         case 4: // fuck DAA
                             data_reg = mb->reg.A;
                             data_flags = mb->reg.F;
@@ -1167,7 +1154,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             
                             goto generic_fetch;
                         
-                        instr_057:
                         case 5: // CPL A
                             mb->reg.F |= MB_FLAG_N | MB_FLAG_H;
                             mb->reg.A = ~mb->reg.A;
@@ -1175,14 +1161,12 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
-                        instr_067:
                         case 6: // SET Cy
                             mb->reg.F = (mb->reg.F & MB_FLAG_Z) + MB_FLAG_C;
                             
                             mb->FMC_MODE = MB_FMC_MODE_NONE;
                             goto generic_fetch;
                         
-                        instr_077:
                         case 7: // CPL Cy
                             mb->reg.F = (mb->reg.F ^ MB_FLAG_C) & (MB_FLAG_C | MB_FLAG_Z);
                             
@@ -1199,7 +1183,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
         case 1: // MOV
             if(COMPILER_LIKELY(IR != 0x76))
             {
-                instr_MOV:
                 {
                 #if GBA
                     var vIR = IR ^ 9;
@@ -1236,7 +1219,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
             }
             else
             {
-                instr_0x76:
                 goto generic_fetch_halt;
             }
         
@@ -1244,8 +1226,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
         case 2: // ALU r8
         {
             // A is always the src and dst, thank fuck
-            
-            instr_ALU:
             
             i_src = IR_F_COL ^ 1;
             
@@ -1278,7 +1258,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     break;
                 
-                //instr_ALU_1:
                 case 1: // ADC Z0HC
                     if(mb->reg.F & 0x10)
                     {
@@ -1304,7 +1283,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     break;
                 
-                //instr_ALU_3:
                 case 3: // SBC Z1HC
                     if(mb->reg.F & MB_FLAG_C)
                     {
@@ -1317,7 +1295,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         goto instr_ALU_2;
                     }
                 
-                 //instr_ALU_7:
                 case 7: // CMP Z1HC
                     mbh_fr_set_r8_sub(mb, data_result, data_reg);
                     
@@ -1334,7 +1311,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     goto generic_fetch;
                 
-                //instr_ALU_4:
                 case 4: // AND Z010
                     mb->FMC_MODE = MB_FMC_MODE_NONE;
                     
@@ -1342,7 +1318,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     data_result &= data_reg;
                     break;
                 
-                //instr_ALU_5:
                 case 5: // XOR Z000
                     mb->FMC_MODE = MB_FMC_MODE_NONE;
                     
@@ -1350,7 +1325,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     data_result ^= data_reg;
                     break;
                 
-                //instr_ALU_6:
                 case 6: // ORR Z000
                     mb->FMC_MODE = MB_FMC_MODE_NONE;
                     
@@ -1396,7 +1370,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             }
                             else
                             {
-                                instr_340:
                                 DBGF("- /HW %04X <- %02X\n", data_wide + 0xFF00, mb->reg.A);
                                 mch_memory_dispatch_write_Haddr(mb, data_wide, mb->reg.A);
                             }
@@ -1406,7 +1379,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                         }
                         else
                         {
-                        instr_weird_r16_r8:
                             data_wide = mch_memory_fetch_PC_op_1(mb);
                             if(data_wide >= 0x80)
                                 data_wide += 0xFF00;
@@ -1443,8 +1415,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     }
                     else // RET cc
                     {
-                        instr_RET_cc:
-                        
                         ncycles += 1; // cc_check penalty cycle
                         
                         if(!MB_CC_CHECK)
@@ -1464,7 +1434,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     {
                         switch((IR >> 4) & 3)
                         {
-                            instr_311:
                             case 0: // RET
                             generic_ret:
                             {
@@ -1479,18 +1448,15 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                                 goto generic_fetch;
                             }
                             
-                            instr_331:
                             case 1: // IRET
                                 mb->IME = 1;
                                 mb->IME_ASK = 1;
                                 goto generic_ret;
                             
-                            instr_351:
                             case 2: // JP HL
                                 mb->PC = mb->reg.HL;
                                 goto generic_fetch; // no cycle penalty, IDU magic
                             
-                            instr_371:
                             case 3: // MOV SP, HL
                                 mb->SP = mb->reg.HL;
                                 ncycles += 1; // cross-IDU wide bus move penalty
@@ -1502,10 +1468,7 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     }
                     else // POP r16
                     {
-                        var SP;
-                        instr_POP_r16:
-                        
-                        SP = mb->SP;
+                        var SP = mb->SP;
                         data_wide = mch_memory_dispatch_read(mb, SP++);
                         data_wide += mch_memory_dispatch_read(mb, (SP++) & 0xFFFF) << 8;
                         mb->SP = SP;
@@ -1541,7 +1504,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             }
                             else
                             {
-                                instr_352:
                                 mch_memory_dispatch_write(mb, data_wide, mb->reg.A);
                             }
                             
@@ -1553,13 +1515,11 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             
                             if(!(IR & 0x10))
                             {
-                                instr_342:
                                 DBGF("- /HW %04X <- %02X\n", data_wide + 0xFF00, mb->reg.A);
                                 mch_memory_dispatch_write_Haddr(mb, data_wide, mb->reg.A);
                             }
                             else
                             {
-                                instr_362:
                                 DBGF("- /HR %04X -> ", data_wide + 0xFF00);
                                 mb->reg.A = mch_memory_dispatch_read_Haddr(mb, data_wide);
                                 DBGF("%02X\n", mb->reg.A);
@@ -1572,14 +1532,13 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     }
                     else // JP cc, a16
                     {
-                        instr_JP_cc_n16: //TODO: optimize this if possible
+                        //TODO: optimize this if possible
                         // small optimization, no imm fetch if no match
                         
                         if(MB_CC_CHECK)
                             goto generic_jp_abs;
                         else
                         {
-                        instr_JP_cc_n16_fail:
                             mb->PC = (mb->PC + 2) & 0xFFFF;
                             ncycles += 2; // a16 fetch/"skip"
                             goto generic_fetch;
@@ -1591,7 +1550,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 {
                     switch(IR_F_ROW)
                     {
-                        instr_303:
                         case 0: // JP a16
                         generic_jp_abs:
                         {
@@ -1601,19 +1559,16 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                             goto generic_fetch;
                         }
                         
-                        instr_313:
                         case 1: // $CB
                             // Do not increment ncycles here,
                             //  it's handled in the $CB opcode handler
                             goto handle_cb;
                         
-                        instr_363:
                         case 6: // DI
                             mb->IME = 0;
                             mb->IME_ASK = 0;
                             goto generic_fetch;
                         
-                        instr_373:
                         case 7: // EI
                             mb->IME_ASK = 1;
                             goto generic_fetch;
@@ -1629,13 +1584,12 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                     
                     if(!(IR & 32))
                     {
-                        instr_CALL_cc_n16: //TODO: optimize
+                        //TODO: optimize
                         
                         if(MB_CC_CHECK)
                             goto generic_call;
                         else
                         {
-                        instr_CALL_cc_n16_fail:
                             mb->PC = (mb->PC + 2) & 0xFFFF;
                             ncycles += 2; // a16 fetch/"skip"
                             goto generic_fetch;
@@ -1699,7 +1653,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 
                 case 6: // ALU n8
                 {
-                    instr_3x6:
                     ncycles += 1; // n8 operand fetch
                     data_reg = mch_memory_fetch_PC_op_1(mb);
                     goto alu_op_begin;
@@ -1707,7 +1660,6 @@ PGB_FUNC ATTR_HOT word mb_exec(self mb)
                 
                 case 7: // RST
                 {
-                    instr_3x7:
                     data_wide = mb->PC;
                     mb->PC = IR & (7 << 3);
                     goto generic_push; // ncycle penalty applied at label
