@@ -777,8 +777,8 @@ int main(int argc, char** argv)
         }
         
         fseek(fi, 0, SEEK_END);
-        ssize_t fs = ftell(fi);
-        if((fs <= 0x7FFF) || (fs & 0x3FFF))
+        ssize_t fs_orig = ftell(fi);
+        if((fs_orig < 0x160))
         {
             fclose(fi);
             puts("Bad ROM size");
@@ -786,9 +786,16 @@ int main(int argc, char** argv)
         }
         fseek(fi, 0, SEEK_SET);
         
-        ssize_t ff = fs;
+        if(fs_orig < 0x8000)
+        {
+            puts("Warning: ROM is *extremely* small, filling to 32k");
+        }
         
-        if(fs & (fs - 1))
+        ssize_t ff = fs_orig;
+        if(ff < 0x8000)
+            ff = 0x8000;
+        
+        if(ff & (ff - 1))
         {
             do
                 ff |= ff >> 1;
@@ -798,24 +805,24 @@ int main(int argc, char** argv)
         }
         
         r8* img = malloc(ff);
-        if(fread(img, fs, 1, fi) != 1)
+        if(fread(img, 1, fs_orig, fi) != fs_orig)
         {
             puts("Bad read");
             fclose(fi);
         }
         fclose(fi);
         
-        if(fs != ff)
+        if(fs_orig != ff)
         {
             puts("WARNING: invalid ROM size, filling rest with $FF.");
             
-            memset(img + fs, 0xFF, ff - fs);
+            memset(img + fs_orig, 0xFF, ff - fs_orig);
             
-            fs = ff;
+            fs_orig = ff;
         }
         
         #if !CONFIG_USE_FLAT_ROM
-        for(i = 0; i != (fs >> 14); i++)
+        for(i = 0; i != (fs_orig >> 14); i++)
             rommap[i] = &img[i << 14];
         #endif
         
@@ -993,7 +1000,7 @@ int main(int argc, char** argv)
         userdata.TIMER_CNT = 0;
         userdata.JOYP_RAW = 0;
         
-        dis.N_ROM = fs >> 14;
+        dis.N_ROM = fs_orig >> 14;
         dis.N_SRAM = 16;
         dis.userdata = &userdata;
         dis.dispatch_IO = cb_IO;
