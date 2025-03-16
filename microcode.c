@@ -20,10 +20,6 @@
 #define MB_CC_CHECK (mbh_cc_check(IR, mb->reg.F))
 
 
-#pragma region Microcode I/O
-
-#pragma endregion
-
 #pragma region Flag mode control
 
 PGB_FUNC static inline void mbh_fr_set_r8_add(self mb, word left, word right)
