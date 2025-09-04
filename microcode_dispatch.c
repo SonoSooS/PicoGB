@@ -5,8 +5,8 @@
 
 #define self mb_state* __restrict
 
-#define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache;
-#define USE_MI struct mi_dispatch* __restrict mi = mb->mi;
+#define USE_MIC struct mb_mi_cache* __restrict mic = &mb->micache
+#define USE_MI struct mi_dispatch* __restrict mi = mb->mi
 
 //#define R_RELATIVE_ADDR (addr & MICACHE_R_SEL)
 #define R_RELATIVE_ADDR (addr - (r_addr << MICACHE_R_BITS))
@@ -318,25 +318,25 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_INLINE __attribute__((optimize("O2"))) static inlin
 
 PGB_FUNC ATTR_FORCE_NOINLINE  __attribute__((optimize("O2"))) static void mch_memory_dispatch_write_ROM(const self mb, word addr, word data)
 {
-    mb->mi->dispatch_ROM(mb->mi->userdata, addr, data, MB_TYPE_WRITE);
+    USE_MI;
+    mi->dispatch_ROM(mi->userdata, addr, data, MB_TYPE_WRITE);
 }
 
 PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_IO(const self mb, word haddr)
 {
-    return mb->mi->dispatch_IO(mb->mi->userdata, haddr, MB_DATA_DONTCARE, MB_TYPE_READ);
+    USE_MI;
+    return mi->dispatch_IO(mi->userdata, haddr, MB_DATA_DONTCARE, MB_TYPE_READ);
 }
 
 PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE  __attribute__((optimize("O2"))) static void mch_memory_dispatch_write_IO(const self mb, word haddr, word data)
 {
-    mb->mi->dispatch_IO(mb->mi->userdata, haddr, data, MB_TYPE_WRITE);
+    USE_MI;
+    mi->dispatch_IO(mi->userdata, haddr, data, MB_TYPE_WRITE);
 }
 
 PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_HRAM(const self mb, word haddr)
 {
-    if(haddr < 0xFF)
-        return mb->mi->HRAM[haddr - 0x80];
-    else
-        return mb->IE;
+    return mb->mi->HRAM[haddr];
 }
 
 PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) word mch_memory_dispatch_read_Haddr(const self mb, word haddr)
@@ -351,10 +351,15 @@ PGB_FUNC ATTR_HOT ATTR_FORCE_NOINLINE __attribute__((optimize("Os"))) void mch_m
 {
     if(haddr < 0x80)
         mch_memory_dispatch_write_IO(mb, haddr, data);
-    else if(haddr < 0xFF)
-        mb->mi->HRAM[haddr - 0x80] = data;
     else
-        mb->IE = data;
+    {
+        if(haddr < 0xFF)
+            ;
+        else
+            mb->IE = data;
+        
+        mb->mi->HRAM[haddr] = data;
+    }
 }
 
 PGB_FUNC ATTR_FORCE_NOINLINE __attribute__((optimize("O2"))) static word mch_memory_dispatch_read_fexx_ffxx(const self mb, word addr)
