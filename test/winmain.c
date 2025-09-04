@@ -1,4 +1,4 @@
-#include <windows.h>
+﻿#include <windows.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +41,7 @@ var _IS_DBG;
 //const char* rompath = "C:\\Downloads\\dmg-acid2.gb";
 //const char* rompath = "C:\\Downloads\\DebugYellow.gbc";
 //const char* rompath = "C:\\Downloads\\game.gb";
-const char* rompath = "C:\\Downloads\\cpu_instrs.gb";
+const char rompath[] = "C:\\Downloads\\cpu_instrs.gb";
 //const char* rompath = "C:\\Downloads\\03-op sp,hl.gb";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Castlevania - The Adventure (Europe).gb";
 //const char* rompath = "C:\\Data\\ROM\\GB\\Felix the Cat (USA, Europe).gb";
@@ -127,6 +127,19 @@ static void mmidi_reset(void)
         return;
     
     NtQuerySystemTime(&mmidi_timer.tickdiff);
+}
+#endif
+
+#ifdef DOUBLESPEED
+static word ecc(word* error_ptr, word value, word shift)
+{
+    word error = *error_ptr;
+    error += value;
+    word result = error >> shift;
+    error -= result << shift;
+    *error_ptr = error;
+    
+    return result;
 }
 #endif
 
@@ -961,7 +974,7 @@ int main(int argc, char** argv)
                 pp.rSTAT = 0;
                 
                 #if CONFIG_DBG
-                _IS_DBG = 0;
+                //_IS_DBG = 0;
                 #endif
             }
         }
@@ -988,7 +1001,7 @@ int main(int argc, char** argv)
                 pp.rSTAT = 0;
                 
                 #if CONFIG_DBG
-                _IS_DBG = 0;
+                //_IS_DBG = 0;
                 #endif
             }
         }
@@ -1095,7 +1108,9 @@ int main(int argc, char** argv)
     var ppirq_tmp = 0;
     
 #ifdef DOUBLESPEED
-    word cycle_error = 0;
+    word cycle_err_cpu = 0;
+    word cycle_err_ppu = 0;
+    word cycle_err_apu = 0;
 #endif
     
     for(;;)
@@ -1119,19 +1134,16 @@ int main(int argc, char** argv)
         if(lol)
             regdump(&mb);
         
-#ifdef DOUBLESPEED
-    #if CONFIG_IS_CGB
-        word repeat = (userdata.CGB_SPEED & 0x80) ? 1 : 0;
-    #else
-        word repeat = 1;
-    #endif
-        word totalcycles = 0;
-#endif
         word cycles;
         
 #ifdef DOUBLESPEED
-    tryagain:
+    #if CONFIG_IS_CGB
+        word speed = (userdata.CGB_SPEED & 0x80) ? 1 : 0;
+    #else
+        word speed = 1;
+    #endif
 #endif
+        
         if(!mb.HALTING || mbh_irq_get_pending(&mb))
         {
             if(mb.HALTING)
@@ -1177,12 +1189,17 @@ int main(int argc, char** argv)
 #if CONFIG_IS_CGB
             if(mb.IMM.high == 0x10)
             {
+                puts("[STOP] !");
                 mb.DIV = 0;
                 if(userdata.CGB_SPEED & 1)
                 {
                     mb.HALTING = 0;
                     userdata.CGB_SPEED ^= 0x80;
                     userdata.CGB_SPEED &= 0xFE;
+                    
+                    printf("Switching speed to %02X\n", userdata.CGB_SPEED);
+                    
+                    continue;
                 }
             }
 #endif
@@ -1215,38 +1232,34 @@ int main(int argc, char** argv)
             break;
         }
         
+        word cycles_cpu;
+        word cycles_ppu;
+        word cycles_apu;
+        
 #ifdef DOUBLESPEED
-        if(repeat)
-        {
-            repeat -= 1;
-            totalcycles += cycles;
-            goto tryagain;
-        }
-        else
-#if CONFIG_IS_CGB
-        if(userdata.CGB_SPEED & 0x80)
-#endif
-        {
-            cycle_error += totalcycles;
-            cycles = cycle_error >> 1;
-            cycle_error -= cycles << 1;
-        }
+        cycles_cpu = cycles;
+        cycles_apu = ecc(&cycle_err_apu, cycles, speed ? 1 : 0);
+        cycles_ppu = ecc(&cycle_err_ppu, cycles << 2, speed ? 1 : 0);
+#else
+        cycles_cpu = cycles;
+        cycles_apu = cycles;
+        cycles_ppu = cycles << 2;
 #endif
         
         //TODO: 17556 samples per frame at 1MiHz
         //TODO:  4389 samples per frame at 256kiHz (GBA)
         
-        mb.DIV += cycles;
-        pgf_timer_update(&userdata, cycles);
+        mb.DIV += cycles_cpu;
+        pgf_timer_update(&userdata, cycles_cpu);
         
         #if !CONFIG_APU_ENABLE
             #if CONFIG_APU_ENABLE_PARTIAL
-                //apu_tick(&apu, cycles, 0);
+                //apu_tick(&apu, cycles_apu, 0);
             #endif
         #else
-        if(hwow)
+        if(hwow && cycles_apu)
         {
-            apu_tick(&apu, cycles, 1);
+            apu_tick(&apu, cycles_apu, 1);
             
             var k = 0;
             j = apu.outbuf_pos >> 1;
@@ -1344,7 +1357,7 @@ int main(int argc, char** argv)
                 ppirq_tmp = 0;
             }
             
-            var ppirq = ppu_tick(&pp, cycles << 2);
+            var ppirq = ppu_tick(&pp, cycles_ppu);
             if(ppirq)
             {
                 //printf("  - IF_SCHED %02X\n", ppirq);
