@@ -121,7 +121,7 @@ PGB_FUNC word pgf_cb_IO_(void* userdata, word addr, word data, word type)
     if(1)
     {
         var reg = addr;
-        var* __restrict rv;
+        var* __restrict rv = NULL;
         
         if(reg < 0x10) // random garbage
         {
